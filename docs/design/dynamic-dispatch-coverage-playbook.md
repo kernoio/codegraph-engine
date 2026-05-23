@@ -176,7 +176,7 @@ Status legend: ✅ done+validated · 🔬 hole identified · ⬜ not started.
 | TypeScript/JS | React / observer / EventEmitter | state→render; dispatch→callback | S + X | ✅ (excalidraw) |
 | TypeScript/JS | Vue / Nuxt | template events (@click→handler); component composition; reactive→render | S + X | ✅ events + composition (vitepress S / vben M / element-plus L); 🔬 reactive→render (vue-core Proxy runtime — frontier, deferred) |
 | TypeScript/JS | Svelte / SvelteKit | template calls/composition; SvelteKit action→api; store→DOM | X | ✅ already strong (realworld S / skeleton M / shadcn L): template `{fn()}` calls, `<Pascal/>` composition, `import * as api` namespace, `load`→api all work out of the box. + exported-const object-of-functions extraction (SvelteKit `actions`). 🔬 `$lib`-namespace-from-action + store/reactive frontier |
-| TypeScript/JS | Express / Koa | request → middleware → handler | ? | ⬜ |
+| TypeScript/JS | Express / Koa | request → route → handler → service | R + X | ✅ named handlers + middleware + controller/service (resolver) + **inline arrow handlers → service body calls** (realworld S 19 / parse M / ghost L 65 edges). 🔬 custom routers (payload had 0 routes — not `app.get`-style) |
 | TypeScript/JS | NestJS | request → controller → provider | ? | ⬜ |
 | TypeScript/JS | RxJS / signals | subscribe → operator → observer | S | ⬜ |
 | Python | Django ORM | QuerySet → SQL compiler | R | ✅ |
@@ -233,6 +233,20 @@ Status legend: ✅ done+validated · 🔬 hole identified · ⬜ not started.
   (local/relative calls from actions connect). **Lesson: measure before assuming a hole** — modern Svelte
   barely uses `on:click={fn}` (form actions / callback props instead), so the assumed event-handler hole
   wasn't the real one; Svelte needed far less than Vue.
+- **Express / Koa (validated 2026-05-23, realworld S / parse M / ghost L) — high-value inline-handler fix.**
+  The resolver already handled named handlers, middleware, and `XController.method`/`XService.method`.
+  The real hole was **inline arrow route handlers** (`router.post('/x', async (req,res) => {...})` — the
+  dominant modern pattern): the handler regex `[^)]+` broke on the arrow's `)`, so the route connected to
+  NOTHING and the anonymous handler's body (the request→service flow) was lost. The entire inline-handler
+  API was unreachable (realworld `POST /users/login` → 0 edges). Fixed (`frameworks/express.ts`): span the
+  call with a string-aware balanced scan; for inline arrows, extract the body's calls (RESERVED-filtered to
+  drop res/req/builtins) and attribute them to the route node → realworld **19** / ghost **65** precise
+  route→service edges (POST /users/login→login, POST /articles→createArticle, …), no node explosion,
+  framework-scoped (zero blast radius off Express). **Deterministic win is clear; the agent A/B is muddied
+  by repo characteristics** — realworld (39 files) is below the size where codegraph beats reading, and
+  Ghost's layered custom-API architecture makes both arms thrash. Residual: **custom routers** — payload's
+  6.4k-file codebase had 0 routes (its router abstraction isn't `app.get`-style, so undetected). Lesson
+  inverse of Svelte: Express's dominant pattern WAS the uncovered one, so it needed real work like Vue.
 - **Difficulty gradient is real:** named-ref dispatch (resolver) is cheap; anonymous
   callback dispatch (synthesizer) is medium; **anonymous-arrow handlers are the hard
   remaining gap** (no identity → need synthesizer link-through-body, not yet built).
