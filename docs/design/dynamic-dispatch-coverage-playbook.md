@@ -210,13 +210,16 @@ Status legend: ✅ done+validated · 🔬 hole identified · ⬜ not started.
   `@click="fn"` → handler, kebab `<el-button>` → `ElButton`. PascalCase `<Child/>` is
   already covered by the JSX channel (the SFC component node spans the template). Result:
   agent reads drop in every size (vben login 1–3 vs 4–11), **strongest where handlers are
-  local functions** (vben `handleLogin`/`handleSubmit`). Two real limits left:
-  (1) **composable-destructure handlers** — `@click="closeSidebar"` where
-  `const { close: closeSidebar } = useSidebarControl()`; the handler isn't a fn node, so
-  it doesn't resolve (vitepress sidebar → 6 reads). Needs destructure→composable-return
-  tracking — a data-flow frontier, deferred. (2) **prefix-convention kebab** — element-plus
-  `el-button` → `button.vue` (component named `button`, not `ElButton`), so kebab stays
-  unresolved there. reactive→render (vue-core Proxy runtime) is the deep frontier, also deferred.
+  local functions** (vben `handleLogin`/`handleSubmit`).
+  **Composable-destructure handlers RESOLVED:** `@click="closeSidebar"` where
+  `const { close: closeSidebar } = useSidebarControl()` now follows alias → composable →
+  the returned `close` fn (when it's defined in the composable's file). vitepress sidebar
+  flow dropped **6 → 0 reads** (best case). Precise-only — no fallback to the composable
+  itself (the static `useX()` call edge already covers that), so it adds nothing where the
+  returned fn can't be located (e.g. re-exported / external composable). Remaining limits:
+  **prefix-convention kebab** — element-plus `el-button` → `button.vue` (component named
+  `button`, not `ElButton`), so kebab stays unresolved there; and **reactive→render**
+  (vue-core Proxy runtime) — the deep framework-internal frontier, deferred.
 - **Difficulty gradient is real:** named-ref dispatch (resolver) is cheap; anonymous
   callback dispatch (synthesizer) is medium; **anonymous-arrow handlers are the hard
   remaining gap** (no identity → need synthesizer link-through-body, not yet built).
