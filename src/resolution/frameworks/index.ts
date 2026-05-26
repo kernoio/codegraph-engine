@@ -23,6 +23,7 @@ import { aspnetResolver } from './csharp';
 import { swiftUIResolver, uikitResolver, vaporResolver } from './swift';
 import { swiftObjcBridgeResolver } from './swift-objc';
 import { reactNativeBridgeResolver } from './react-native';
+import { expoModulesResolver } from './expo-modules';
 
 /**
  * All registered framework resolvers
@@ -60,6 +61,8 @@ const FRAMEWORK_RESOLVERS: FrameworkResolver[] = [
   swiftObjcBridgeResolver,
   // React Native JS ↔ native bridge (legacy + TurboModules)
   reactNativeBridgeResolver,
+  // Expo Modules — Function/AsyncFunction/Property DSL on Swift/Kotlin
+  expoModulesResolver,
 ];
 
 /**
@@ -132,3 +135,4 @@ export { aspnetResolver } from './csharp';
 export { swiftUIResolver, uikitResolver, vaporResolver } from './swift';
 export { swiftObjcBridgeResolver } from './swift-objc';
 export { reactNativeBridgeResolver } from './react-native';
+export { expoModulesResolver } from './expo-modules';

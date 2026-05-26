@@ -370,8 +370,8 @@ otherwise closed but a Fabric flow still breaks.
 | Swift × Objective-C | bridging | Swift call → ObjC selector; ObjC call → @objc Swift method | R | ✅ Phase 1 (§8a) |
 | JavaScript × Objective-C/Java/Kotlin | React Native legacy bridge | `NativeModules.<M>.<f>` → `RCT_EXPORT_METHOD` / `@ReactMethod` | R | ✅ Phase 2 (§8b) |
 | JavaScript × native | React Native TurboModules | spec interface ↔ impl | R (spec as ground truth) | ✅ partial — name-match path lands (§8b) |
-| Objective-C/Java/Kotlin → JavaScript | React Native event emitters | `[self sendEventWithName:]` → `addListener` | S (cross-lang channel) | ⬜ Phase 3 |
-| JavaScript × Swift/Kotlin | Expo Modules | `requireNativeModule('X').fn(...)` → `Function("fn") { }` | R | ⬜ Phase 4 |
+| Objective-C/Java/Kotlin → JavaScript | React Native event emitters | `[self sendEventWithName:]` → `addListener` | S (cross-lang channel) | ✅ Phase 3 (§8e) |
+| JavaScript × Swift/Kotlin | Expo Modules | `requireNativeModule('X').fn(...)` → `Function("fn") { }` | R (extract synthesizes method nodes) | ✅ Phase 4 (§8f) |
 | JavaScript × native | React Native Fabric views | `<MyView p=v/>` → `RCT_EXPORT_VIEW_PROPERTY` / Codegen view spec | R + JSX | ⬜ Phase 6 (defer) |
 
 ### 8a. Phase 1 measurements — Swift ↔ ObjC
@@ -416,6 +416,49 @@ runs against the populated index.
 |---|---|---|
 | swift-objc | `init`, `description`, `hash`, `isEqual`, `copy`, `count`, `value`, `data`, `string`, `object`, `add`, `remove`, `update`, `load`, `save`, `reload`, `cancel`, `start`, `stop`, `pause`, `resume`, `close`, `open`, `show`, `hide`, `dealloc`, `release`, `retain`, `autorelease`, … | Every NSObject subclass implements these; bridging them to arbitrary project-local ObjC methods produces noise. Regular name-matcher handles them on its own. |
 | react-native | `addListener`, `removeListeners`, `remove`, `invalidate`, `startObserving`, `stopObserving` | Every `RCTEventEmitter` subclass declares these via `RCT_EXPORT_METHOD`. JS callers of `.addListener(...)` / `.remove(...)` go through `NativeEventEmitter` (JS abstraction), not the native bridge directly. |
+
+### 8e. Phase 3 measurements — RN native → JS event channel
+
+Synthesizer pattern; extends `src/resolution/callback-synthesizer.ts` with a
+cross-language event channel keyed by literal event name. Validates on
+**RNFirebase** (large):
+
+| Synthesized event channel | Edges | Sample |
+|---|---|---|
+| `messaging_message_received` | 2 | `application:didReceiveRemoteNotification:fetchCompletionHandler:` → TS `onMessage` (and the `UNUserNotificationCenter` willPresent variant → same `onMessage`) |
+| `messaging_notification_opened` | 1 | `userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:` → TS `onNotificationOpenedApp` |
+
+Each edge is `provenance:'heuristic'`,
+`metadata.synthesizedBy:'rn-event-channel'`. Same `EVENT_FANOUT_CAP = 6`
+as the in-language channel — generic event names with too many handlers
+or dispatchers skip rather than over-link.
+
+The synthesizer also handles the **subscribe-wrapper pattern** common in
+RN libraries (`messaging().onMessage(listener)` where `listener` is a
+parameter that flows up to user code): when the JS handler arg isn't a
+named symbol, it attributes the listener to the ENCLOSING JS function
+(reachability-correct, attributes to the abstraction layer).
+
+### 8f. Phase 4 measurements — Expo Modules
+
+Framework `extract()` parses Swift / Kotlin source for literal
+`Function("X") { … }` / `AsyncFunction("X") { … }` / `Property("X") { … }`
+/ `Constants` declarations inside `class X: Module` (or `: Module()` in
+Kotlin) and emits a `method` node named `X` per literal. The standard
+name-matcher resolves JS callsites like `Foo.takePictureAsync(...)` to
+these synthetic nodes via the existing `obj.method` → method-name path.
+
+Validated on real Expo SDK packages:
+
+| Package | Files indexed | Expo method nodes extracted | Cross-language edges |
+|---|---|---|---|
+| **expo-haptics** | 14 | 6 (3 Swift + 3 Kotlin: `notificationAsync`, `impactAsync`, `selectionAsync` / `performHapticsAsync`) | Module nodes registered; consumer-app callers resolve via name-match |
+| **expo-camera** | 72 | 41 (Swift + Kotlin; covers `takePictureAsync`, `record`, `resumePreview`, `getAvailableLenses`, `scanFromURLAsync`, `requestCameraPermissionsAsync`, view-side `width` / `height` properties, …) | 9 swift→expo, 7 kotlin→expo internal edges. JS-side callsites in the package shadow the native names with TS wrappers (`pausePreview()` defined on `CameraView.tsx`); name-match correctly prefers the local TS method. An external consumer app of `Camera.takePictureAsync()` resolves through to the native method directly. |
+
+Five tests cover the extractor + an end-to-end fixture:
+`JS callsite of literal AsyncFunction("uniqueExpoHapticCall") resolves
+to the native impl node` — confirms the resolver-free bridge path
+works when names aren't shadowed.
 
 ---
 
