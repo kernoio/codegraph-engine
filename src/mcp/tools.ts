@@ -21,11 +21,13 @@ import {
   lstatSync,
   openSync,
   readFileSync,
+  statSync,
   writeSync,
 } from 'fs';
 import { clamp, validatePathWithinRoot, validateProjectPath } from '../utils';
 import { isGeneratedFile } from '../extraction/generated-detection';
 import { tmpdir } from 'os';
+import * as pathModule from 'path';
 import { join, resolve as resolvePath } from 'path';
 
 /** Maximum output length to prevent context bloat (characters) */
@@ -1167,18 +1169,80 @@ export class ToolHandler {
     // is structurally the same as cobra's; both deserve the same
     // sufficiency steering.
     let smallRepoTail = '';
+    let smallRepoRouteInline = '';
     if (isTinyRepo || isSmallRepo) {
+      // Iter12: backend-computed routing manifest for routing queries.
+      // Builds a URL → handler map directly from the graph (each route
+      // node has a `references` edge to its handler), then inlines the
+      // top handler file's source. The agent gets the canonical
+      // routing answer in one MCP call — no need to parse framework
+      // DSL or grep for handlers.
+      //
+      // Replaces iter10's raw route-file inline. The manifest is more
+      // information-dense (parsed URL→handler map vs raw config DSL)
+      // and we still inline the top handler file's source so the agent
+      // has the implementation bodies inline too.
+      const isRouteQuery = /\b(route|routes|routing|request|handler|endpoint|api|controller|middleware|dispatch|invok)/i.test(task);
+      if (isRouteQuery) {
+        try {
+          const manifest = cg.getRoutingManifest(40);
+          if (manifest) {
+            // 1) Compact URL→handler list (~30-60 lines, ~1-2KB).
+            const lines: string[] = [
+              `\n\n## Routing manifest (${manifest.totalRoutes} routes, top handler file holds ${manifest.topHandlerFileCount})`,
+              '',
+              '| URL | Handler | Location |',
+              '|---|---|---|',
+            ];
+            for (const e of manifest.entries) {
+              lines.push(`| \`${e.url}\` | \`${e.handler}\` | ${e.handlerFile}:${e.handlerLine} |`);
+            }
+            // 2) Inline the top handler file's source.
+            if (manifest.topHandlerFile && manifest.topHandlerFileCount >= 2) {
+              try {
+                const fullPath = pathModule.join(cg.getProjectRoot(), manifest.topHandlerFile);
+                const stat = statSync(fullPath);
+                if (stat.size > 0 && stat.size <= 16000) {
+                  const source = readFileSync(fullPath, 'utf-8');
+                  const capped = source.length > 7000 ? source.slice(0, 7000) + '\n... (truncated)' : source;
+                  const ext = (manifest.topHandlerFile.match(/\.([a-z]+)$/i)?.[1] || '').toLowerCase();
+                  const lang =
+                    ext === 'rb' ? 'ruby' : ext === 'py' ? 'python' :
+                    ext === 'go' ? 'go' : ext === 'rs' ? 'rust' :
+                    ext === 'js' || ext === 'jsx' ? 'javascript' :
+                    ext === 'ts' || ext === 'tsx' ? 'typescript' :
+                    ext === 'java' ? 'java' : ext === 'kt' ? 'kotlin' :
+                    ext === 'cs' ? 'csharp' : ext === 'php' ? 'php' :
+                    ext === 'swift' ? 'swift' : ext === 'yml' || ext === 'yaml' ? 'yaml' : '';
+                  lines.push('');
+                  lines.push(`### Top handler file (\`${manifest.topHandlerFile}\` — ${manifest.topHandlerFileCount}/${manifest.totalRoutes} routes, full source inlined — do NOT Read)`);
+                  lines.push('');
+                  lines.push('```' + lang);
+                  lines.push(capped);
+                  lines.push('```');
+                }
+              } catch { /* file read failed, skip the source inline */ }
+            }
+            smallRepoRouteInline = lines.join('\n');
+          }
+        } catch {
+          // Manifest build failed — drop silently
+        }
+      }
       const sizeQualifier = isTinyRepo ? 'under 150' : 'under 500';
-      smallRepoTail = `\n\n---\n> **This project is small** (${sizeQualifier} indexed files). The entry points and code above cover the relevant surface — **do NOT call codegraph_explore as a follow-up; its content will largely duplicate this response**. If you need a specific flow, call \`codegraph_trace from→to\`. If you need one specific symbol's body, call \`codegraph_node <name>\`. Otherwise, answer from what is above.`;
+      const routingClause = smallRepoRouteInline
+        ? ' The URL→handler manifest and top handler file are also inlined above — answer routing questions from them.'
+        : '';
+      smallRepoTail = `\n\n---\n> **This project is small** (${sizeQualifier} indexed files). The entry points and code above cover the relevant surface — **do NOT call codegraph_explore as a follow-up; its content will largely duplicate this response**. If you need a specific flow, call \`codegraph_trace from→to\`. If you need one specific symbol's body, call \`codegraph_node <name>\`.${routingClause} Otherwise, answer from what is above.`;
     }
 
     // buildContext returns string when format is 'markdown'
     if (typeof context === 'string') {
-      return this.textResult(this.truncateOutput(context + flowTrace + reminder + smallRepoTail));
+      return this.textResult(this.truncateOutput(context + flowTrace + reminder + smallRepoRouteInline + smallRepoTail));
     }
 
     // If it returns TaskContext, format it
-    return this.textResult(this.truncateOutput(this.formatTaskContext(context) + flowTrace + reminder + smallRepoTail));
+    return this.textResult(this.truncateOutput(this.formatTaskContext(context) + flowTrace + reminder + smallRepoRouteInline + smallRepoTail));
   }
 
   /**
