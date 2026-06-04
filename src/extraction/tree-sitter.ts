@@ -1888,61 +1888,66 @@ export class TreeSitterExtractor {
   }
 
   /**
-   * Emit one `imports` reference per leaf binding of a Rust `use` declaration —
+   * Emit one `imports` reference per binding of a Rust `use` declaration —
    * `use crate::m::Item`, `use crate::m::{A, B as C}`, `pub use self::sub::Item`.
-   * The leaf name (the defining symbol, not the local alias) is resolved by the
-   * name-matcher to its definition, so a `pub use` re-export hub (a `mod.rs`
-   * re-exporting submodule items) depends on the modules it re-exports, and a
-   * `use`d item that's only stored/passed (not called/typed) still links.
-   * `use ...::*` and bare `self`/`super`/`crate` segments have no leaf to link.
+   * Emits the FULL path (e.g. `self::sub::Item`, not just `Item`) so the resolver
+   * can resolve the module prefix to a file and find the leaf symbol there —
+   * disambiguating common-name re-exports (`pub use self::read::read`, where the
+   * leaf `read` collides with many same-named symbols). Falls back to name-match
+   * on the leaf when the path can't be resolved. `use ...::*` has no leaf binding.
    */
   private emitRustUseBindingRefs(node: SyntaxNode, fromNodeId: string): void {
-    const leaves: SyntaxNode[] = [];
-    const collect = (n: SyntaxNode): void => {
+    const paths: { text: string; node: SyntaxNode }[] = [];
+    const join = (prefix: string, seg: string): string => (prefix ? `${prefix}::${seg}` : seg);
+    const collect = (n: SyntaxNode, prefix: string): void => {
       switch (n.type) {
         case 'identifier':
-          leaves.push(n);
+          paths.push({ text: join(prefix, getNodeText(n, this.source)), node: n });
           break;
         case 'scoped_identifier': {
-          // `a::b::C` → the leaf is the final `name` segment.
-          const name = getChildByField(n, 'name') ?? n.namedChild(n.namedChildCount - 1);
-          if (name && name.type === 'identifier') leaves.push(name);
+          // Full scoped path (`a::b::C`); combine with any outer group prefix.
+          const full = getNodeText(n, this.source).trim();
+          paths.push({ text: prefix ? `${prefix}::${full}` : full, node: n });
           break;
         }
         case 'scoped_use_list': {
-          // `path::{ ... }` → recurse into the list; the path prefix isn't a leaf.
+          // `path::{ ... }` — the group's path becomes the prefix for each item.
+          const pathNode = getChildByField(n, 'path');
+          const seg = pathNode ? getNodeText(pathNode, this.source).trim() : '';
+          const newPrefix = seg ? join(prefix, seg) : prefix;
           const list = getChildByField(n, 'list') ?? n.namedChildren.find((c) => c.type === 'use_list');
-          if (list) collect(list);
+          if (list) collect(list, newPrefix);
           break;
         }
         case 'use_list':
           for (let i = 0; i < n.namedChildCount; i++) {
             const c = n.namedChild(i);
-            if (c) collect(c);
+            if (c) collect(c, prefix);
           }
           break;
         case 'use_as_clause': {
           // `Path as Alias` → link the source path (the definition), not the alias.
-          const path = getChildByField(n, 'path') ?? n.namedChild(0);
-          if (path) collect(path);
+          const p = getChildByField(n, 'path') ?? n.namedChild(0);
+          if (p) collect(p, prefix);
           break;
         }
-        // use_wildcard / self / super / crate → no specific leaf to link.
+        // use_wildcard → no specific binding to link.
       }
     };
     for (let i = 0; i < node.namedChildCount; i++) {
       const c = node.namedChild(i);
-      if (c) collect(c);
+      if (c) collect(c, '');
     }
-    for (const leaf of leaves) {
-      const name = getNodeText(leaf, this.source);
-      if (!name || name === 'self' || name === 'super' || name === 'crate') continue;
+    for (const p of paths) {
+      // The leaf must be a real name (skip a path that is only `self`/`super`/`crate`).
+      const leaf = p.text.split('::').pop();
+      if (!leaf || leaf === 'self' || leaf === 'super' || leaf === 'crate' || leaf === '*') continue;
       this.unresolvedReferences.push({
         fromNodeId,
-        referenceName: name,
+        referenceName: p.text,
         referenceKind: 'imports',
-        line: leaf.startPosition.row + 1,
-        column: leaf.startPosition.column,
+        line: p.node.startPosition.row + 1,
+        column: p.node.startPosition.column,
       });
     }
   }

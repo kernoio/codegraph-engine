@@ -4839,4 +4839,23 @@ describe('Rust cross-module recall', () => {
       cg.destroy();
     } finally { cleanupTempDir(dir); }
   });
+
+  it('resolves a qualified path to the correct module when the leaf name collides', async () => {
+    const dir = rustProject({
+      'lib.rs': 'pub mod fast;\npub mod slow;\npub mod hub;\n',
+      'fast.rs': 'pub fn read() -> i32 { 1 }\n',
+      'slow.rs': 'pub fn read() -> i32 { 2 }\n',
+      // `read` exists in BOTH fast.rs and slow.rs — module-path resolution must
+      // send this re-export to fast.rs specifically, not name-match either.
+      'hub.rs': 'pub use crate::fast::read;\n',
+    });
+    try {
+      const cg = CodeGraph.initSync(dir, { config: { include: ['src/**/*.rs'], exclude: [] } });
+      await cg.indexAll();
+      cg.resolveReferences();
+      expect(cg.getFileDependents('src/fast.rs')).toContain('src/hub.rs');
+      expect(cg.getFileDependents('src/slow.rs')).not.toContain('src/hub.rs');
+      cg.destroy();
+    } finally { cleanupTempDir(dir); }
+  });
 });
