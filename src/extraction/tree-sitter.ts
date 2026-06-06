@@ -2746,11 +2746,72 @@ export class TreeSitterExtractor {
    *      tree-sitter to interpret the namespace block as a function_definition,
    *      hiding real class/struct/enum nodes inside the "function body".
    */
+  /**
+   * Rocket route-registration macros — `routes![a::b::handler, c::d::other]`
+   * and `catchers![not_found]`. Tree-sitter leaves a macro body as a flat
+   * `token_tree` of raw tokens (`identifier`, `::`, `,`), so the handler paths
+   * are never seen as references and each handler fn looks like it has no caller
+   * — it's mounted by Rocket at runtime, not called by in-repo code, so its file
+   * shows 0 dependents. Walk the token tree, reconstruct each comma-separated
+   * path, and emit a `references` edge; the Rust path resolver
+   * (`resolveRustPathReference`) then links it to the handler fn. The handler
+   * names are explicit in source, so this is precise static extraction, not a
+   * heuristic — no false edges (resolution still validates each path).
+   */
+  private extractRustRouteMacro(node: SyntaxNode): void {
+    if (this.language !== 'rust') return;
+    const macroName = node.namedChild(0);
+    if (!macroName) return;
+    const name = getNodeText(macroName, this.source);
+    if (name !== 'routes' && name !== 'catchers') return;
+    const tokenTree = node.namedChildren.find((c: SyntaxNode) => c.type === 'token_tree');
+    if (!tokenTree) return;
+    const fromId = this.nodeStack[this.nodeStack.length - 1];
+    if (!fromId) return;
+
+    // The token tree is a flat stream: `[ id :: id :: id , id … ]`. Group runs
+    // of `identifier` tokens (the `::` joiners are anonymous) into one path; a
+    // `,` (or the closing `]`) ends a path.
+    let parts: string[] = [];
+    let line = 0;
+    let column = 0;
+    const flush = (): void => {
+      if (parts.length > 0) {
+        this.unresolvedReferences.push({
+          fromNodeId: fromId,
+          referenceName: parts.join('::'),
+          referenceKind: 'references',
+          line,
+          column,
+        });
+        parts = [];
+      }
+    };
+    for (let i = 0; i < tokenTree.childCount; i++) {
+      const t = tokenTree.child(i);
+      if (!t) continue;
+      if (t.type === 'identifier') {
+        if (parts.length === 0) {
+          line = t.startPosition.row + 1;
+          column = t.startPosition.column;
+        }
+        parts.push(getNodeText(t, this.source));
+      } else if (t.type === ',') {
+        flush();
+      }
+    }
+    flush();
+  }
+
   private visitFunctionBody(body: SyntaxNode, _functionId: string): void {
     if (!this.extractor) return;
 
     const visitForCallsAndStructure = (node: SyntaxNode): void => {
       const nodeType = node.type;
+
+      // Rocket route-registration macros (`routes![…]` / `catchers![…]`): the
+      // handler paths live in a raw token tree the call walker can't see.
+      if (nodeType === 'macro_invocation') this.extractRustRouteMacro(node);
 
       if (this.extractor!.callTypes.includes(nodeType)) {
         this.extractCall(node);

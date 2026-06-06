@@ -4287,6 +4287,34 @@ describe('Rust module-path call resolution', () => {
     const deps = [...cg.getImpactRadius(find!.id, 2).nodes.values()].map((n) => n.filePath ?? '');
     expect(deps.some((p) => p.endsWith('routes/mod.rs')), 'database::profiles::find() resolves to the leaf fn').toBe(true);
   });
+
+  it('Rocket `routes![…]` / `catchers![…]` macros link the mount to the handler fns', async () => {
+    // Tree-sitter leaves the macro body as a raw token tree, so the handler
+    // paths inside `routes![a::b::handler, …]` are invisible to the call walker
+    // and the handlers — mounted by Rocket at runtime, not called in-repo — look
+    // like they have no caller. The route-macro extractor reconstructs each path
+    // and emits a reference, which the Rust path resolver links to the handler.
+    const routes = path.join(tempDir, 'src/routes');
+    fs.mkdirSync(routes, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'src/lib.rs'),
+      `mod routes;\nfn not_found() {}\npub fn rocket() {\n` +
+      `    rocket::build()\n` +
+      `        .mount("/api", routes![routes::users::post_users, routes::users::get_user])\n` +
+      `        .register("/", catchers![not_found]);\n}\n`);
+    fs.writeFileSync(path.join(routes, 'mod.rs'), `pub mod users;\n`);
+    fs.writeFileSync(path.join(routes, 'users.rs'), `pub fn post_users() {}\npub fn get_user() {}\n`);
+
+    cg = CodeGraph.initSync(tempDir);
+    await cg.indexAll();
+    cg.resolveReferences();
+
+    const handlers = cg.getNodesByKind('function').filter((n) => n.filePath.endsWith('routes/users.rs'));
+    expect(handlers.length, 'both handler fns indexed').toBe(2);
+    for (const h of handlers) {
+      const deps = [...cg.getImpactRadius(h.id, 2).nodes.values()].map((n) => n.filePath ?? '');
+      expect(deps.some((p) => p.endsWith('lib.rs')), `routes![] links ${h.name} to its mount in lib.rs`).toBe(true);
+    }
+  });
 });
 
 describe('Objective-C messages, class receivers, and #import', () => {
