@@ -453,6 +453,25 @@ export class TreeSitterExtractor {
       if (ownerId) {
         this.extractDecoratorsFor(node, ownerId);
         this.extractVariableTypeAnnotation(node, ownerId);
+        // Fluent / SwiftUI property-wrapper attributes often reference a model or
+        // type by metatype in their ARGUMENTS — `@Siblings(through: Pivot.self,
+        // …)`, `@Group(…)`. extractDecoratorsFor captures the wrapper type
+        // (`Siblings`); this pulls the TYPE out of the argument expressions
+        // (`Pivot.self` → a dependency on Pivot), so a model reached ONLY through
+        // a relationship (a many-to-many pivot/join model) isn't left orphaned.
+        // extractStaticMemberRef self-filters to `Type.member` navigation, so the
+        // `\.$keypath` arguments and the wrapper `user_type` are skipped.
+        const modifiers = node.namedChildren.find((c: SyntaxNode) => c.type === 'modifiers');
+        if (modifiers) {
+          const walkAttrArgs = (n: SyntaxNode): void => {
+            this.extractStaticMemberRef(n);
+            for (let i = 0; i < n.namedChildCount; i++) {
+              const c = n.namedChild(i);
+              if (c) walkAttrArgs(c);
+            }
+          };
+          walkAttrArgs(modifiers);
+        }
       }
     }
     // `export_statement` itself is not extracted — the walker descends
