@@ -14,12 +14,11 @@ import * as path from 'path';
 import {
   planBinaryRemoval,
   executeBinaryRemoval,
-  npmInvocation,
   type RemoveBinaryProbes,
   type BinaryRemovalPlan,
   type RemoveBinaryDeps,
 } from '../src/upgrade/remove-binary';
-import { NPM_PACKAGE } from '../src/upgrade';
+import { NPM_PACKAGE, npmInvocation } from '../src/upgrade';
 
 const HOME = '/home/u';
 const STATE = `${HOME}/.codegraph`;

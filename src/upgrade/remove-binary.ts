@@ -38,7 +38,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { spawnSync } from 'child_process';
-import { detectInstallMethod, NPM_PACKAGE } from './index';
+import { detectInstallMethod, npmInvocation, NPM_PACKAGE } from './index';
 
 // ---------------------------------------------------------------------------
 // Planner (pure — every probe injected)
@@ -107,18 +107,6 @@ function pathFor(platform: NodeJS.Platform): path.PlatformPath {
 /** The machine-level state dir that must survive an artifacts-only removal. */
 function stateDir(p: RemoveBinaryProbes): string {
   return pathFor(p.platform).join(p.homedir, '.codegraph');
-}
-
-/**
- * How to invoke npm. On Windows npm is a .cmd batch file, which Node refuses
- * to spawn without a shell (EINVAL since the CVE-2024-27980 hardening) — route
- * it through cmd.exe, the same way the upgrade's surface-refresh step does.
- */
-export function npmInvocation(platform: NodeJS.Platform, npmArgs: string[]): { cmd: string; args: string[] } {
-  if (platform === 'win32') {
-    return { cmd: 'cmd.exe', args: ['/d', '/s', '/c', ['npm', ...npmArgs].join(' ')] };
-  }
-  return { cmd: 'npm', args: npmArgs };
 }
 
 /** Candidate bundle install dirs: the running binary's own, plus the defaults. */
