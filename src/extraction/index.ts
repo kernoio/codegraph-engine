@@ -34,6 +34,7 @@ import ignore, { Ignore } from 'ignore';
 import { detectFrameworks } from '../resolution/frameworks';
 import type { ResolutionContext } from '../resolution/types';
 import { createYielder, type MaybeYield } from '../resolution/cooperative-yield';
+import { loadConfiguredPlugins } from '../plugin-system';
 
 /**
  * Number of files to read in parallel during indexing.
@@ -1489,6 +1490,8 @@ export class ExtractionOrchestrator {
     };
   }
 
+  private pluginsLoaded = false;
+
   /**
    * Detect frameworks on demand using the current scanned files (or a fresh
    * scan if none are provided). Cached on the orchestrator so repeat calls
@@ -1500,6 +1503,13 @@ export class ExtractionOrchestrator {
     const context = this.buildDetectionContext(fileList);
     this.detectedFrameworkNames = detectFrameworks(context).map((r) => r.name);
     return this.detectedFrameworkNames;
+  }
+
+  private async ensurePluginsLoaded(): Promise<void> {
+    if (this.pluginsLoaded) return;
+    await loadConfiguredPlugins(this.rootDir);
+    this.pluginsLoaded = true;
+    this.detectedFrameworkNames = null;
   }
 
   /**
@@ -1523,6 +1533,7 @@ export class ExtractionOrchestrator {
   ): Promise<IndexResult> {
     const tGrammar = Date.now();
     await initGrammars();
+    await this.ensurePluginsLoaded();
     if (process.env.CODEGRAPH_SYNTH_TIMINGS) console.error(`[phase-timing] grammar-init: ${Date.now() - tGrammar}ms`);
     const startTime = Date.now();
     const errors: ExtractionError[] = [];
