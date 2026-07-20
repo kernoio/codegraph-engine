@@ -44,4 +44,26 @@ export async function POST() { return Response.json({}); }
     const names = result.nodes.map((n) => n.name).sort();
     expect(names).toEqual(['GET /api/feedback', 'POST /api/feedback']);
   });
+
+  it('extracts re-exported HTTP methods from app route.ts', () => {
+    const content = `export { GET } from "@/modules/api/v2/health/route";\n`;
+    const result = reactResolver.extract!(
+      'apps/web/app/api/v2/health/route.ts',
+      content
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /api/v2/health']);
+  });
+
+  it('extracts export const HTTP handlers from app route.ts', () => {
+    const content = `
+export const GET = async () => Response.json({});
+export const POST = async () => Response.json({});
+`;
+    const result = reactResolver.extract!(
+      'apps/web/app/api/v2/me/route.ts',
+      content
+    );
+    const names = result.nodes.map((n) => n.name).sort();
+    expect(names).toEqual(['GET /api/v2/me', 'POST /api/v2/me']);
+  });
 });
