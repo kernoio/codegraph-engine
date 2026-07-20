@@ -29,6 +29,7 @@ import { expoModulesResolver } from './expo-modules';
 import { fabricViewResolver } from './fabric';
 import { cicsResolver } from './cics';
 import { terraformResolver } from './terraform';
+import { tsoaResolver } from './tsoa';
 
 /**
  * All registered framework resolvers
@@ -41,6 +42,7 @@ const FRAMEWORK_RESOLVERS: FrameworkResolver[] = [
   expressResolver,
   nestjsResolver,
   reactResolver,
+  tsoaResolver,
   svelteResolver,
   vueResolver,
   astroResolver,
