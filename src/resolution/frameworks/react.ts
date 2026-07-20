@@ -190,26 +190,65 @@ export const reactResolver: FrameworkResolver = {
       }
     }
 
-    // Extract Next.js pages/routes (pages directory convention)
-    if (filePath.includes('pages/') || filePath.includes('app/')) {
-      // Default export in pages becomes a route
-      if (content.includes('export default')) {
-        const routePath = filePathToRoute(filePath);
-        if (routePath) {
-          const line = content.indexOf('export default');
-          const lineNum = content.slice(0, line).split('\n').length;
+    // Extract Next.js pages/routes (pages directory + App Router page/route)
+    if (/(?:^|\/)(?:pages|app)\//.test(filePath)) {
+      const routePath = filePathToRoute(filePath);
+      if (routePath) {
+        const isRouteHandler = /(?:^|\/)route\.(tsx?|jsx?)$/.test(filePath);
+        const hasDefault = content.includes('export default');
+        const httpExports = isRouteHandler
+          ? Array.from(
+              content.matchAll(
+                /\bexport\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/g
+              )
+            ).map((m) => m[1]!)
+          : [];
+
+        if (isRouteHandler && httpExports.length > 0) {
+          for (const method of httpExports) {
+            const line = content.search(
+              new RegExp(`\\bexport\\s+(?:async\\s+)?function\\s+${method}\\b`)
+            );
+            const lineNum = line >= 0 ? content.slice(0, line).split('\n').length : 1;
+            nodes.push({
+              id: `route:${filePath}:${routePath}:${method}:${lineNum}`,
+              kind: 'route',
+              name: `${method} ${routePath}`,
+              qualifiedName: `${filePath}::route:${method}:${routePath}`,
+              filePath,
+              startLine: lineNum,
+              endLine: lineNum,
+              startColumn: 0,
+              endColumn: 0,
+              language: filePath.endsWith('.tsx')
+                ? 'tsx'
+                : filePath.endsWith('.ts')
+                  ? 'typescript'
+                  : 'javascript',
+              updatedAt: now,
+            });
+          }
+        } else if (hasDefault || isRouteHandler) {
+          const line = hasDefault
+            ? content.indexOf('export default')
+            : content.search(/\bexport\s+(?:async\s+)?function\s+/);
+          const lineNum = line >= 0 ? content.slice(0, line).split('\n').length : 1;
 
           nodes.push({
             id: `route:${filePath}:${routePath}:${lineNum}`,
             kind: 'route',
-            name: routePath,
+            name: isRouteHandler ? `ANY ${routePath}` : routePath,
             qualifiedName: `${filePath}::route:${routePath}`,
             filePath,
             startLine: lineNum,
             endLine: lineNum,
             startColumn: 0,
             endColumn: 0,
-            language: filePath.endsWith('.tsx') ? 'tsx' : filePath.endsWith('.ts') ? 'typescript' : 'javascript',
+            language: filePath.endsWith('.tsx')
+              ? 'tsx'
+              : filePath.endsWith('.ts')
+                ? 'typescript'
+                : 'javascript',
             updatedAt: now,
           });
         }
@@ -351,14 +390,16 @@ function filePathToRoute(filePath: string): string | null {
   }
 
   if (/(?:^|\/)app\//.test(filePath)) {
-    // App router - only page.tsx files are routes
-    if (!filePath.includes('page.')) {
+    // App Router: page.tsx (UI routes) and route.ts (Route Handlers)
+    const isPage = /(?:^|\/)page\.(tsx?|jsx?)$/.test(filePath);
+    const isRouteHandler = /(?:^|\/)route\.(tsx?|jsx?)$/.test(filePath);
+    if (!isPage && !isRouteHandler) {
       return null;
     }
 
     let route = filePath
       .replace(/^.*app\//, '/')
-      .replace(/\/page\.(tsx?|jsx?)$/, '')
+      .replace(/\/(?:page|route)\.(tsx?|jsx?)$/, '')
       .replace(/\[([^\]]+)\]/g, ':$1');
 
     if (route === '') route = '/';

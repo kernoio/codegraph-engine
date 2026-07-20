@@ -152,3 +152,5 @@ export { swiftObjcBridgeResolver } from './swift-objc';
 export { reactNativeBridgeResolver } from './react-native';
 export { expoModulesResolver } from './expo-modules';
 export { fabricViewResolver } from './fabric';
+export { tsoaResolver } from './tsoa';
+export { terraformResolver } from './terraform';
