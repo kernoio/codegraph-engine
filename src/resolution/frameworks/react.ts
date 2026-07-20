@@ -190,55 +190,26 @@ export const reactResolver: FrameworkResolver = {
       }
     }
 
-    // Extract Next.js pages/routes (pages directory + App Router page/route)
-    if (/(?:^|\/)(?:pages|app)\//.test(filePath)) {
-      const routePath = filePathToRoute(filePath);
-      if (routePath) {
-        const isRouteHandler = /(?:^|\/)route\.(tsx?|jsx?)$/.test(filePath);
-        const hasDefault = content.includes('export default');
-        const httpExports = isRouteHandler
-          ? Array.from(
-              content.matchAll(
-                /\bexport\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/g
-              )
-            ).map((m) => m[1]!)
-          : [];
+    // Extract Next.js pages/routes (pages directory + App Router page/route handlers)
+    const routePath = filePathToRoute(filePath);
+    if (routePath) {
+      const isRouteHandler = /(?:^|\/)route\.(tsx?|jsx?)$/.test(filePath);
+      const hasDefault = content.includes('export default');
+      const httpExports = isRouteHandler ? collectHttpRouteExports(content) : [];
 
-        if (isRouteHandler && httpExports.length > 0) {
-          for (const method of httpExports) {
-            const line = content.search(
-              new RegExp(`\\bexport\\s+(?:async\\s+)?function\\s+${method}\\b`)
-            );
-            const lineNum = line >= 0 ? content.slice(0, line).split('\n').length : 1;
-            nodes.push({
-              id: `route:${filePath}:${routePath}:${method}:${lineNum}`,
-              kind: 'route',
-              name: `${method} ${routePath}`,
-              qualifiedName: `${filePath}::route:${method}:${routePath}`,
-              filePath,
-              startLine: lineNum,
-              endLine: lineNum,
-              startColumn: 0,
-              endColumn: 0,
-              language: filePath.endsWith('.tsx')
-                ? 'tsx'
-                : filePath.endsWith('.ts')
-                  ? 'typescript'
-                  : 'javascript',
-              updatedAt: now,
-            });
-          }
-        } else if (hasDefault || isRouteHandler) {
-          const line = hasDefault
-            ? content.indexOf('export default')
-            : content.search(/\bexport\s+(?:async\s+)?function\s+/);
+      if (isRouteHandler && httpExports.length > 0) {
+        for (const method of httpExports) {
+          const line = content.search(
+            new RegExp(
+              `\\bexport\\s+(?:async\\s+)?(?:function\\s+|const\\s+)${method}\\b|\\bexport\\s*\\{[^}]*\\b${method}\\b`
+            )
+          );
           const lineNum = line >= 0 ? content.slice(0, line).split('\n').length : 1;
-
           nodes.push({
-            id: `route:${filePath}:${routePath}:${lineNum}`,
+            id: `route:${filePath}:${routePath}:${method}:${lineNum}`,
             kind: 'route',
-            name: isRouteHandler ? `ANY ${routePath}` : routePath,
-            qualifiedName: `${filePath}::route:${routePath}`,
+            name: `${method} ${routePath}`,
+            qualifiedName: `${filePath}::route:${method}:${routePath}`,
             filePath,
             startLine: lineNum,
             endLine: lineNum,
@@ -252,12 +223,60 @@ export const reactResolver: FrameworkResolver = {
             updatedAt: now,
           });
         }
+      } else if (hasDefault || isRouteHandler) {
+        const line = hasDefault
+          ? content.indexOf('export default')
+          : content.search(/\bexport\s+/);
+        const lineNum = line >= 0 ? content.slice(0, line).split('\n').length : 1;
+
+        nodes.push({
+          id: `route:${filePath}:${routePath}:${lineNum}`,
+          kind: 'route',
+          name: isRouteHandler ? `ANY ${routePath}` : routePath,
+          qualifiedName: `${filePath}::route:${routePath}`,
+          filePath,
+          startLine: lineNum,
+          endLine: lineNum,
+          startColumn: 0,
+          endColumn: 0,
+          language: filePath.endsWith('.tsx')
+            ? 'tsx'
+            : filePath.endsWith('.ts')
+              ? 'typescript'
+              : 'javascript',
+          updatedAt: now,
+        });
       }
     }
 
     return { nodes, references };
   },
 };
+
+const HTTP_ROUTE_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
+
+/** Named HTTP exports: `export function GET`, `export const GET =`, `export { GET, POST }`. */
+function collectHttpRouteExports(content: string): string[] {
+  const found = new Set<string>();
+  const fnOrConst = new RegExp(
+    `\\bexport\\s+(?:async\\s+)?(?:function\\s+|const\\s+)(${HTTP_ROUTE_METHODS.join('|')})\\b`,
+    'g'
+  );
+  let m: RegExpExecArray | null;
+  while ((m = fnOrConst.exec(content)) !== null) {
+    found.add(m[1]!);
+  }
+  const reExport = /\bexport\s*\{([^}]+)\}/g;
+  while ((m = reExport.exec(content)) !== null) {
+    for (const part of m[1]!.split(',')) {
+      const name = part.trim().split(/\s+as\s+/i)[0]?.trim();
+      if (name && (HTTP_ROUTE_METHODS as readonly string[]).includes(name)) {
+        found.add(name);
+      }
+    }
+  }
+  return Array.from(found);
+}
 
 /**
  * Check if string is PascalCase
