@@ -7,7 +7,8 @@
     "next-health",
     "next-signup",
     "next-posts",
-    "django-users"
+    "django-users",
+    "nestjs-novu-widgets"
   ],
   "repos": [
     {
