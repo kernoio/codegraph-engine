@@ -1,0 +1,5 @@
+{
+  "framework": "next-app-router",
+  "source": "https://github.com/shadcn-ui/taxonomy — app/api/posts/route.ts",
+  "routes": ["GET /api/posts", "POST /api/posts"]
+}
