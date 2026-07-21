@@ -73,12 +73,3 @@ assets/generate-waitlist.py
 
 # Local scratch tests (never commit)
 __tests__/zz-scratch*
-.env.agent.*
-ecosystem.agent.*.config.cjs
-
-# HAR harness runtime (generated per slot / run)
-.har/artifacts/
-.har/logs/
-.har/runs/
-.har/slots/
-.har/state/

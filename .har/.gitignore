@@ -1,7 +1,0 @@
-validations/
-# HAR harness runtime (generated per slot / run)
-artifacts/
-logs/
-runs/
-slots/
-state/
