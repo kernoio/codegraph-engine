@@ -7,6 +7,11 @@
  * — `github.com/example/myproject/pkga` — as a third-party package, so
  * resolution falls through to name-matching with path proximity and returns
  * a tiny fraction of the real call sites. See issue #388.
+ *
+ * Multi-module repos (mattermost server + public, Go workspaces) declare
+ * nested `go.mod` files. `findGoModuleForFile` walks upward from a file to
+ * the nearest module root so sub-project indexes attribute symbols correctly
+ * (issue #7).
  */
 
 import * as fs from 'fs';
@@ -22,26 +27,75 @@ export interface GoModule {
 /**
  * Read the `go.mod` file at the project root and extract the module path.
  * Returns `null` if no `go.mod` exists or it has no `module` directive.
- *
- * Limitation: only the project-root `go.mod` is read. Nested `go.mod` files
- * (Go workspaces, monorepos with multiple modules) are not yet resolved —
- * a follow-up if a real repro shows up.
  */
 export function loadGoModule(projectRoot: string): GoModule | null {
-  const goModPath = path.join(projectRoot, 'go.mod');
+  return parseGoModAt(path.join(projectRoot, 'go.mod'), projectRoot);
+}
+
+/**
+ * Find the Go module that owns `relativeFilePath` by walking up from the file's
+ * directory toward `projectRoot`, returning the nearest `go.mod` found.
+ */
+export function findGoModuleForFile(projectRoot: string, relativeFilePath: string): GoModule | null {
+  const absProject = path.resolve(projectRoot);
+  let dir = path.dirname(path.resolve(absProject, relativeFilePath));
+
+  while (dir.startsWith(absProject)) {
+    const mod = parseGoModAt(path.join(dir, 'go.mod'), dir);
+    if (mod) return mod;
+    if (dir === absProject) break;
+    dir = path.dirname(dir);
+  }
+
+  return loadGoModule(projectRoot);
+}
+
+/**
+ * Discover every `go.mod` under `projectRoot` (bounded depth) for multi-module
+ * attribution. Skips `.git`, `node_modules`, and `vendor`.
+ */
+export function discoverGoModules(projectRoot: string, maxDepth = 6): GoModule[] {
+  const absRoot = path.resolve(projectRoot);
+  const out: GoModule[] = [];
+  const seen = new Set<string>();
+
+  function walk(dir: string, depth: number): void {
+    if (depth > maxDepth) return;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    const mod = parseGoModAt(path.join(dir, 'go.mod'), dir);
+    if (mod && !seen.has(mod.rootDir)) {
+      seen.add(mod.rootDir);
+      out.push(mod);
+    }
+
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === 'vendor') continue;
+      walk(path.join(dir, e.name), depth + 1);
+    }
+  }
+
+  walk(absRoot, 0);
+  return out;
+}
+
+function parseGoModAt(goModPath: string, rootDir: string): GoModule | null {
   let content: string;
   try {
     content = fs.readFileSync(goModPath, 'utf-8');
   } catch {
     return null;
   }
-  // `module <path>` is the first non-comment directive in any valid go.mod.
-  // Strip line comments so a `// module foo` doesn't false-match.
   const stripped = content.replace(/\/\/[^\n]*/g, '');
   const match = stripped.match(/^\s*module\s+(\S+)\s*$/m);
   if (!match) return null;
-  // Strip optional quoting around the module path.
   const modulePath = match[1]!.replace(/^["']|["']$/g, '');
   if (!modulePath) return null;
-  return { modulePath, rootDir: projectRoot };
+  return { modulePath, rootDir };
 }
