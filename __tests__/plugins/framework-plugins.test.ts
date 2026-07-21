@@ -9,6 +9,11 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import {
+  isNextHttpRouteHandler,
+  isNextPageRoute,
+  filePathToAppRoute,
+} from '../../src/plugins/next-app-router/route-path';
 import { reactResolver } from '../../src/resolution/frameworks/react';
 import { getBuiltInPlugins, getBuiltInPluginResolvers } from '../../src/plugins';
 import {
@@ -193,6 +198,52 @@ export default function Page() { return null; }
 
     const fromReact = reactResolver.extract!('app/about/page.tsx', page);
     expect(fromReact.nodes.map((n) => n.name)).toEqual(['/about']);
+  });
+
+  it('tags HTTP handlers by METHOD-prefixed route name', () => {
+    const result = nextAppRouterResolver.extract!(
+      'apps/web/app/api/v2/health/route.ts',
+      FORMBRICKS_HEALTH_ROUTE_REEXPORT
+    );
+    expect(result.nodes[0]?.name).toBe('GET /api/v2/health');
+    expect(isNextHttpRouteHandler(result.nodes[0]!)).toBe(true);
+  });
+
+  it('strips Next.js route groups from handler paths', () => {
+    expect(
+      filePathToAppRoute('apps/web/app/(app)/environments/[id]/route.ts', 'route')
+    ).toBe('/environments/:id');
+    expect(
+      filePathToAppRoute('apps/web/app/(auth)/auth/login/page.tsx', 'page')
+    ).toBe('/auth/login');
+  });
+
+  it('does not index module implementation route.ts outside app/', () => {
+    const impl = `
+export async function GET() { return Response.json({ ok: true }); }
+`;
+    const result = nextAppRouterResolver.extract!('modules/api/v2/health/route.ts', impl);
+    expect(result.nodes).toHaveLength(0);
+  });
+
+  it('separates page UI routes from HTTP handlers for endpoint totals', () => {
+    const page = `export default function Page() { return null; }`;
+    const pageNodes = reactResolver.extract!('app/(app)/dashboard/page.tsx', page).nodes;
+    const handlerNodes = nextAppRouterResolver.extract!(
+      'app/api/v2/health/route.ts',
+      FORMBRICKS_HEALTH_ROUTE_REEXPORT
+    ).nodes;
+
+    expect(pageNodes).toHaveLength(1);
+    expect(handlerNodes).toHaveLength(1);
+
+    const allRoutes = [...pageNodes, ...handlerNodes];
+    expect(allRoutes).toHaveLength(2);
+    expect(allRoutes.filter(isNextHttpRouteHandler)).toHaveLength(1);
+    expect(allRoutes.filter(isNextPageRoute)).toHaveLength(1);
+    expect(allRoutes.filter(isNextHttpRouteHandler).map((n) => n.name)).toEqual([
+      'GET /api/v2/health',
+    ]);
   });
 });
 

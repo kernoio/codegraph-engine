@@ -72,14 +72,23 @@ async function loadCodeGraph() {
   return mod.CodeGraph ?? mod.default;
 }
 
+function routeNodes(cg) {
+  return cg.searchNodes('', { kinds: ['route'], limit: 5000 }).map((r) => r.node);
+}
+
 function routeNames(cg) {
-  return cg
-    .searchNodes('', { kinds: ['route'], limit: 5000 })
-    .map((r) => r.node.name)
+  return routeNodes(cg)
+    .map((n) => n.name)
     .sort();
 }
 
-function assertRoutes(caseId, actual, expected) {
+/** Mirrors `isNextHttpRouteHandler` — SCIP-comparable endpoint totals. */
+function isHttpHandlerRoute(node) {
+  if (/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+\//.test(node.name)) return true;
+  return /::route:(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS):/.test(node.qualifiedName ?? '');
+}
+
+function assertRoutes(caseId, actual, expected, { endpointScope } = {}) {
   const missing = expected.filter((r) => !actual.includes(r));
   const extra = actual.filter((r) => !expected.includes(r));
   if (missing.length) {
@@ -88,6 +97,11 @@ function assertRoutes(caseId, actual, expected) {
     );
   }
   if (extra.length) {
+    if (endpointScope === 'http-handler') {
+      throw new Error(
+        `${caseId}: unexpected routes for endpoint scope [${extra.join(', ')}]; got [${actual.join(', ')}]`
+      );
+    }
     log(`  note ${caseId}: extra routes [${extra.join(', ')}] (allowed)`);
   }
 }
@@ -102,8 +116,14 @@ async function runMiniRepoCase(CodeGraph, caseId) {
     copyDir(filesDir, tmp);
     const cg = await CodeGraph.init(tmp, { silent: true });
     await cg.indexAll();
-    const routes = routeNames(cg);
-    assertRoutes(caseId, routes, expected.routes);
+    const nodes = routeNodes(cg);
+    const routes =
+      expected.endpointScope === 'http-handler'
+        ? nodes.filter(isHttpHandlerRoute).map((n) => n.name).sort()
+        : nodes.map((n) => n.name).sort();
+    assertRoutes(caseId, routes, expected.routes, {
+      endpointScope: expected.endpointScope,
+    });
     cg.close();
     return { caseId, framework: expected.framework, routes, pass: true };
   } finally {

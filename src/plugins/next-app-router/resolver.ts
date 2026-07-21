@@ -1,11 +1,17 @@
 /**
  * Next.js App Router Route Handlers (Kerno in-repo plugin)
  *
- * Stock upstream `react` only indexes app page.* UI routes.
- * This plugin adds HTTP Route Handlers under app/.../route.ts:
+ * Stock upstream `react` indexes App Router page UI files only (`page.tsx`).
+ * This plugin adds HTTP Route Handlers under `app/.../route.ts`:
  *   - `export async function GET`
  *   - `export const GET = …`
  *   - `export { GET, POST } from '…'`
+ *
+ * Only files under an `app/` segment are indexed — implementation modules such
+ * as `modules/.../route.ts` (formbricks-style) are intentionally excluded so
+ * thin `app/api/.../route.ts` re-exports are not double-counted.
+ *
+ * See `route-path.ts` for the page-vs-handler product rule and SCIP alignment.
  */
 
 import { Node } from '../../types';
@@ -13,6 +19,9 @@ import {
   FrameworkResolver,
   FrameworkExtractionResult,
 } from '../../resolution/types';
+import {
+  filePathToAppRoute,
+} from './route-path';
 
 const HTTP_ROUTE_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
 
@@ -42,7 +51,7 @@ export const nextAppRouterResolver: FrameworkResolver = {
     if (!/(?:^|\/)route\.(tsx?|jsx?)$/.test(filePath)) {
       return { nodes: [], references: [] };
     }
-    const routePath = filePathToAppRoute(filePath);
+    const routePath = filePathToAppRoute(filePath, 'route');
     if (!routePath) {
       return { nodes: [], references: [] };
     }
@@ -108,18 +117,4 @@ function collectHttpRouteExports(content: string): string[] {
     }
   }
   return Array.from(found);
-}
-
-/** `apps/web/app/api/v2/health/route.ts` → `/api/v2/health` */
-function filePathToAppRoute(filePath: string): string | null {
-  if (!/(?:^|\/)app\//.test(filePath)) return null;
-  if (!/(?:^|\/)route\.(tsx?|jsx?)$/.test(filePath)) return null;
-
-  let route = filePath
-    .replace(/^.*app\//, '/')
-    .replace(/\/route\.(tsx?|jsx?)$/, '')
-    .replace(/\[([^\]]+)\]/g, ':$1');
-
-  if (route === '') route = '/';
-  return route;
 }

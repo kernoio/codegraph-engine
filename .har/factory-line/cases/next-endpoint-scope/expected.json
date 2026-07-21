@@ -1,0 +1,6 @@
+{
+  "framework": "next-app-router",
+  "endpointScope": "http-handler",
+  "source": "Endpoint scope — page UI + HTTP handler; SCIP totals use handlers only",
+  "routes": ["GET /api/v2/health"]
+}

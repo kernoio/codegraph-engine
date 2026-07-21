@@ -351,7 +351,7 @@ function filePathToRoute(filePath: string): string | null {
   }
 
   if (/(?:^|\/)app\//.test(filePath)) {
-    // App router - only page.tsx files are routes (HTTP route.ts → next-app-router plugin)
+    // App router - only page.tsx UI routes (HTTP route.ts → kerno-next-app-router plugin)
     if (!filePath.includes('page.')) {
       return null;
     }
@@ -359,6 +359,7 @@ function filePathToRoute(filePath: string): string | null {
     let route = filePath
       .replace(/^.*app\//, '/')
       .replace(/\/page\.(tsx?|jsx?)$/, '')
+      .replace(/\/\([^/]+\)/g, '')
       .replace(/\[([^\]]+)\]/g, ':$1');
 
     if (route === '') route = '/';
