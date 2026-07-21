@@ -1,5 +1,0 @@
-{
-  "framework": "next-app-router",
-  "source": "https://github.com/formbricks/formbricks — apps/web/app/api/v2/health/route.ts",
-  "routes": ["GET /api/v2/health"]
-}
