@@ -1,18 +1,17 @@
 /**
- * tsoa Framework Resolver (Kerno)
+ * tsoa Framework Resolver (Kerno in-repo plugin)
  *
  * Detects routes from `@Route` + `@Get/@Post/@Put/@Patch/@Delete/@Head/@Options`
- * method decorators (lightdash and similar).
+ * method decorators.
  */
 
 import { Node } from '../../types';
 import {
   FrameworkResolver,
   UnresolvedRef,
-  ResolutionContext,
   FrameworkExtractionResult,
-} from '../types';
-import { stripCommentsForRegex } from '../strip-comments';
+} from '../../resolution/types';
+import { stripCommentsForRegex } from '../../resolution/strip-comments';
 
 const HTTP_METHODS = ['Get', 'Post', 'Put', 'Patch', 'Delete', 'Head', 'Options'];
 
@@ -20,7 +19,7 @@ export const tsoaResolver: FrameworkResolver = {
   name: 'tsoa',
   languages: ['typescript', 'javascript', 'tsx', 'jsx'],
 
-  detect(context: ResolutionContext): boolean {
+  detect(context) {
     const packageJson = context.readFile('package.json');
     if (packageJson) {
       try {
@@ -151,6 +150,8 @@ function joinPath(prefix: string, methodPath: string): string {
 
 function methodNameAfter(safe: string, from: number): string | null {
   const slice = safe.slice(from, from + 200);
-  const m = slice.match(/\)\s*(?:public|private|protected|async|static|\s)*([A-Za-z_][A-Za-z0-9_]*)\s*\(/);
+  const m = slice.match(
+    /\)\s*(?:public|private|protected|async|static|\s)*([A-Za-z_][A-Za-z0-9_]*)\s*\(/
+  );
   return m ? m[1]! : null;
 }
