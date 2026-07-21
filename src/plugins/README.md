@@ -31,3 +31,6 @@ Keep detector logic out of `src/resolution/frameworks/{react,nestjs,go}.ts`
 when a dedicated plugin can own it. Rebase upstream; re-apply only the
 registration loop in `frameworks/index.ts` plus any remaining Nest/Go
 hardenings until those become plugins too.
+
+NestJS and Go Kerno hardenings live in `src/plugins/nestjs` and
+`src/plugins/go` and replace the stock resolvers at runtime (same `name`).

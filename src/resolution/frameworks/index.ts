@@ -162,4 +162,9 @@ export { reactNativeBridgeResolver } from './react-native';
 export { expoModulesResolver } from './expo-modules';
 export { fabricViewResolver } from './fabric';
 export { terraformResolver } from './terraform';
-export { tsoaResolver, nextAppRouterResolver } from '../../plugins';
+export {
+  tsoaResolver,
+  nextAppRouterResolver,
+  nestjsResolver as nestjsPluginResolver,
+  goResolver as goPluginResolver,
+} from '../../plugins';

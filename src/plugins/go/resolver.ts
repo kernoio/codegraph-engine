@@ -1,12 +1,18 @@
 /**
- * Go Framework Resolver
+ * Go Framework Resolver (Kerno in-repo plugin)
  *
- * Handles Gin, Echo, Fiber, Chi, and standard library patterns.
+ * Extends upstream Go route detection with Chi/gorilla Method/Methods calls,
+ * PathPrefix stacking, and related handler attribution hardenings.
  */
 
 import { Node } from '../../types';
-import { FrameworkResolver, UnresolvedRef, ResolvedRef, ResolutionContext } from '../types';
-import { stripCommentsForRegex } from '../strip-comments';
+import {
+  FrameworkResolver,
+  UnresolvedRef,
+  ResolvedRef,
+  ResolutionContext,
+} from '../../resolution/types';
+import { stripCommentsForRegex } from '../../resolution/strip-comments';
 
 export const goResolver: FrameworkResolver = {
   name: 'go',
@@ -114,38 +120,133 @@ export const goResolver: FrameworkResolver = {
           ? 'ANY'
           : rawMethod!.toUpperCase();
 
-      const routeNode: Node = {
-        id: `route:${filePath}:${line}:${method}:${path}`,
-        kind: 'route',
-        name: `${method} ${path}`,
-        qualifiedName: `${filePath}::route:${path}`,
-        filePath,
-        startLine: line,
-        endLine: line,
-        startColumn: 0,
-        endColumn: match[0].length,
-        language: 'go',
-        updatedAt: now,
-      };
-      nodes.push(routeNode);
+      addGoRoute(nodes, references, filePath, line, method, path, match[0].length, handlerExpr!, now);
+    }
 
-      const handlerName = extractGoTailIdent(handlerExpr!);
-      if (handlerName) {
-        references.push({
-          fromNodeId: routeNode.id,
-          referenceName: handlerName,
-          referenceKind: 'references',
-          line,
-          column: 0,
+    // Chi / gorilla: r.Method("GET", "/path", handler) and r.Methods([]string{"GET"}, ...)
+    const methodCallRe =
+      /\b\w+\.Method(?:s)?\s*\(\s*(?:\[\]string\{([^}]*)\}|"([A-Z]+)")\s*,\s*"([^"]+)"\s*,\s*([^)]+)\)/g;
+    while ((match = methodCallRe.exec(safe)) !== null) {
+      const methodsRaw = match[1] ?? match[2] ?? '';
+      const routePath = match[3]!;
+      const handlerExpr = match[4]!;
+      if (!routePath.startsWith('/')) continue;
+      const methods = methodsRaw.includes('"')
+        ? Array.from(methodsRaw.matchAll(/"([A-Z]+)"/g)).map((m) => m[1]!)
+        : methodsRaw
+          ? [methodsRaw]
+          : ['ANY'];
+      const line = safe.slice(0, match.index).split('\n').length;
+      for (const method of methods.length > 0 ? methods : ['ANY']) {
+        addGoRoute(
+          nodes,
+          references,
           filePath,
-          language: 'go',
-        });
+          line,
+          method,
+          routePath,
+          match[0].length,
+          handlerExpr,
+          now
+        );
+      }
+    }
+
+    // Prefer METHOD + path on Handle when the path is Go 1.22 style already handled above.
+    // Chi PathPrefix stacking within a file: rewrite fragment-only ANY routes when a
+    // preceding PathPrefix("/api") appears earlier in the same file (best-effort).
+    const prefixes = collectGoPathPrefixes(safe);
+    if (prefixes.length > 0) {
+      for (const node of nodes) {
+        if (!node.name.startsWith('ANY ')) continue;
+        const path = node.name.slice(4);
+        if (!path.startsWith('/') || path.split('/').length > 3) continue;
+        const prefix = prefixBefore(prefixes, node.startLine);
+        if (!prefix) continue;
+        const full = joinGoPath(prefix, path);
+        if (full !== path) {
+          node.name = `ANY ${full}`;
+          node.qualifiedName = `${filePath}::route:${full}`;
+        }
       }
     }
 
     return { nodes, references };
   },
 };
+
+function addGoRoute(
+  nodes: Node[],
+  references: UnresolvedRef[],
+  filePath: string,
+  line: number,
+  method: string,
+  path: string,
+  length: number,
+  handlerExpr: string,
+  now: number
+): void {
+  const routeNode: Node = {
+    id: `route:${filePath}:${line}:${method}:${path}`,
+    kind: 'route',
+    name: `${method} ${path}`,
+    qualifiedName: `${filePath}::route:${path}`,
+    filePath,
+    startLine: line,
+    endLine: line,
+    startColumn: 0,
+    endColumn: length,
+    language: 'go',
+    updatedAt: now,
+  };
+  nodes.push(routeNode);
+
+  const handlerName = extractGoTailIdent(handlerExpr);
+  if (handlerName) {
+    references.push({
+      fromNodeId: routeNode.id,
+      referenceName: handlerName,
+      referenceKind: 'references',
+      line,
+      column: 0,
+      filePath,
+      language: 'go',
+    });
+  }
+}
+
+interface GoPrefix {
+  path: string;
+  line: number;
+}
+
+function collectGoPathPrefixes(safe: string): GoPrefix[] {
+  const out: GoPrefix[] = [];
+  const re = /\.(?:PathPrefix|Route|Group)\(\s*"([^"]+)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(safe)) !== null) {
+    out.push({
+      path: m[1]!,
+      line: safe.slice(0, m.index).split('\n').length,
+    });
+  }
+  return out;
+}
+
+function prefixBefore(prefixes: GoPrefix[], line: number): string | null {
+  let best: string | null = null;
+  for (const p of prefixes) {
+    if (p.line <= line) best = p.path;
+  }
+  return best;
+}
+
+function joinGoPath(prefix: string, sub: string): string {
+  const parts = [prefix, sub]
+    .map((p) => p.trim().replace(/^\/+|\/+$/g, ''))
+    .filter((p) => p.length > 0);
+  return '/' + parts.join('/');
+}
 
 /**
  * Go 1.22 net/http mux patterns: `mux.HandleFunc("GET /users/{id}", h)`.

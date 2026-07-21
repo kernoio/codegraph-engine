@@ -1,5 +1,8 @@
 /**
- * NestJS Framework Resolver
+ * NestJS Framework Resolver (Kerno in-repo plugin)
+ *
+ * Extends upstream NestJS detection with multi-prefix @Controller arrays,
+ * globalPrefix / URI versioning in postExtract, and related hardenings.
  *
  * Handles NestJS decorator-based routing across its transport layers:
  *   - HTTP:          @Controller(prefix) + @Get/@Post/@Put/@Patch/@Delete/@Head/@Options/@All
@@ -28,8 +31,8 @@ import {
   UnresolvedRef,
   ResolvedRef,
   ResolutionContext,
-} from '../types';
-import { stripCommentsForRegex } from '../strip-comments';
+} from '../../resolution/types';
+import { stripCommentsForRegex } from '../../resolution/strip-comments';
 
 // ---------------------------------------------------------------------------
 // Public surface — see comment at top of file. This file owns four NestJS
@@ -158,9 +161,18 @@ export const nestjsResolver: FrameworkResolver = {
     // HTTP routes: method decorator path joined onto the enclosing controller's prefix.
     for (const hit of findDecorators(safe, HTTP_METHODS)) {
       const scope = scopeFor(scopes, hit.index);
-      const prefix = scope && scope.kind === 'controller' ? scope.prefix : '';
-      const path = joinHttpPath(prefix, parseStringArg(hit.args));
-      addRoute(hit.index, hit.name.toUpperCase(), path, hit.length, methodNameAfter(safe, hit.end));
+      const prefixes =
+        scope && scope.kind === 'controller'
+          ? scope.prefixes.length > 0
+            ? scope.prefixes
+            : [scope.prefix]
+          : [''];
+      const methodPath = parseStringArg(hit.args);
+      const handler = methodNameAfter(safe, hit.end);
+      for (const prefix of prefixes) {
+        const path = joinHttpPath(prefix, methodPath);
+        addRoute(hit.index, hit.name.toUpperCase(), path, hit.length, handler);
+      }
     }
 
     // GraphQL operations: only inside an @Resolver class (disambiguates the
@@ -217,29 +229,48 @@ export const nestjsResolver: FrameworkResolver = {
   postExtract(context: ResolutionContext): Node[] {
     const moduleToPrefix = new Map<string, string>();
     const controllerToModule = new Map<string, string>();
+    let globalPrefix = '';
+    let uriDefaultVersion: string | null = null;
 
     for (const filePath of context.getAllFiles()) {
-      if (!/\.module\.(m?[jt]s|cjs)$/.test(filePath)) continue;
+      if (!/\.(m?[jt]sx?|cjs)$/.test(filePath)) continue;
       const content = context.readFile(filePath);
       if (!content) continue;
       const safe = stripCommentsForRegex(content, detectLanguage(filePath));
-      collectRouterModuleRegistrations(safe, moduleToPrefix);
-      collectModuleControllers(safe, controllerToModule);
+
+      if (/\.module\.(m?[jt]s|cjs)$/.test(filePath)) {
+        collectRouterModuleRegistrations(safe, moduleToPrefix);
+        collectModuleControllers(safe, controllerToModule);
+      }
+
+      const gp = safe.match(/\.setGlobalPrefix\(\s*['"`]([^'"`]+)['"`]/);
+      if (gp) globalPrefix = gp[1]!;
+
+      if (/VersioningType\.URI/.test(safe)) {
+        const ver =
+          safe.match(/defaultVersion\s*:\s*['"`]([^'"`]+)['"`]/) ||
+          safe.match(/defaultVersion\s*:\s*(\d+)/);
+        if (ver) uriDefaultVersion = ver[1]!;
+      }
     }
 
     const controllerToPrefix = new Map<string, string>();
     for (const [controller, module] of controllerToModule) {
       const prefix = moduleToPrefix.get(module);
-      // `''` and `'/'` are no-op prefixes; skip them so we don't run updates
-      // that would set name to the value it already has.
       if (prefix && prefix !== '' && prefix !== '/') {
         controllerToPrefix.set(controller, prefix);
       }
     }
 
-    if (controllerToPrefix.size === 0) return [];
-
     const updates: Node[] = [];
+    const seen = new Set<string>();
+
+    const pushUpdate = (node: Node | null) => {
+      if (!node || seen.has(node.id + node.name)) return;
+      seen.add(node.id + node.name);
+      updates.push(node);
+    };
+
     for (const [controllerName, prefix] of controllerToPrefix) {
       const classes = context
         .getNodesByName(controllerName)
@@ -249,16 +280,30 @@ export const nestjsResolver: FrameworkResolver = {
           .getNodesInFile(cls.filePath)
           .filter((n) => n.kind === 'route');
         for (const route of routes) {
-          // Multiple controllers can live in one file (covered by the
-          // existing "attributes methods to the right controller" test);
-          // each route must be associated with the controller whose line
-          // range contains it.
           if (route.startLine < cls.startLine || route.startLine > cls.endLine) {
             continue;
           }
           const updated = applyModulePrefix(route, prefix);
-          if (updated && updated.name !== route.name) updates.push(updated);
+          if (updated && updated.name !== route.name) pushUpdate(updated);
         }
+      }
+    }
+
+    const outerPrefix = [globalPrefix, uriDefaultVersion ? `v${uriDefaultVersion}` : '']
+      .map((p) => p.trim().replace(/^\/+|\/+$/g, ''))
+      .filter((p) => p.length > 0)
+      .join('/');
+
+    if (outerPrefix) {
+      const routes =
+        context.iterateNodesByKind?.('route') != null
+          ? Array.from(context.iterateNodesByKind!('route'))
+          : context.getNodesByKind('route');
+      for (const route of routes) {
+        if (!route.name.includes(' ')) continue;
+        const already = updates.find((u) => u.id === route.id) ?? route;
+        const updated = applyModulePrefix(already, outerPrefix);
+        if (updated && updated.name !== already.name) pushUpdate(updated);
       }
     }
 
@@ -416,6 +461,8 @@ interface ClassScope {
   kind: ClassKind;
   /** HTTP prefix (controller) or WS namespace (gateway); '' otherwise. */
   prefix: string;
+  /** Additional prefixes when `@Controller(['a','b'])` lists multiple paths. */
+  prefixes: string[];
   start: number;
   end: number;
 }
@@ -427,19 +474,43 @@ interface ClassScope {
  * many classes share a file.
  */
 function buildClassScopes(safe: string): ClassScope[] {
-  const defs: Array<{ kind: ClassKind; name: string; prefixOf: (a: string) => string }> = [
-    { kind: 'controller', name: 'Controller', prefixOf: parseControllerPrefix },
-    { kind: 'resolver', name: 'Resolver', prefixOf: () => '' },
-    { kind: 'gateway', name: 'WebSocketGateway', prefixOf: parseGatewayNamespace },
-    { kind: 'other', name: 'Injectable', prefixOf: () => '' },
-    { kind: 'other', name: 'Module', prefixOf: () => '' },
-    { kind: 'other', name: 'Catch', prefixOf: () => '' },
+  const defs: Array<{
+    kind: ClassKind;
+    name: string;
+    prefixOf: (a: string) => { primary: string; all: string[] };
+  }> = [
+    {
+      kind: 'controller',
+      name: 'Controller',
+      prefixOf: (a) => {
+        const all = parseControllerPrefixes(a);
+        return { primary: all[0] ?? '', all };
+      },
+    },
+    { kind: 'resolver', name: 'Resolver', prefixOf: () => ({ primary: '', all: [''] }) },
+    {
+      kind: 'gateway',
+      name: 'WebSocketGateway',
+      prefixOf: (a) => {
+        const ns = parseGatewayNamespace(a);
+        return { primary: ns, all: [ns] };
+      },
+    },
+    { kind: 'other', name: 'Injectable', prefixOf: () => ({ primary: '', all: [''] }) },
+    { kind: 'other', name: 'Module', prefixOf: () => ({ primary: '', all: [''] }) },
+    { kind: 'other', name: 'Catch', prefixOf: () => ({ primary: '', all: [''] }) },
   ];
 
-  const raw: Array<{ kind: ClassKind; prefix: string; index: number }> = [];
+  const raw: Array<{ kind: ClassKind; prefix: string; prefixes: string[]; index: number }> = [];
   for (const def of defs) {
     for (const hit of findDecorators(safe, [def.name])) {
-      raw.push({ kind: def.kind, prefix: def.prefixOf(hit.args), index: hit.index });
+      const parsed = def.prefixOf(hit.args);
+      raw.push({
+        kind: def.kind,
+        prefix: parsed.primary,
+        prefixes: parsed.all,
+        index: hit.index,
+      });
     }
   }
   raw.sort((a, b) => a.index - b.index);
@@ -447,6 +518,7 @@ function buildClassScopes(safe: string): ClassScope[] {
   return raw.map((r, i) => ({
     kind: r.kind,
     prefix: r.prefix,
+    prefixes: r.prefixes,
     start: r.index,
     end: i + 1 < raw.length ? raw[i + 1]!.index : safe.length,
   }));
@@ -469,11 +541,19 @@ function parseStringArg(args: string): string {
   return m ? m[1]! : '';
 }
 
-/** `@Controller('users')` | `@Controller({ path: 'users', host })` | `@Controller(['a','b'])` | `@Controller()`. */
-function parseControllerPrefix(args: string): string {
+/** All path prefixes from a Controller decorator (supports string arrays). */
+function parseControllerPrefixes(args: string): string[] {
   const obj = args.match(/path\s*:\s*['"`]([^'"`]*)['"`]/);
-  if (obj) return obj[1]!;
-  return parseStringArg(args);
+  if (obj) return [obj[1]!];
+
+  const arrayBody = args.match(/^\s*\[([^\]]*)\]/);
+  if (arrayBody) {
+    const paths = Array.from(arrayBody[1]!.matchAll(/['"`]([^'"`]*)['"`]/g)).map((m) => m[1]!);
+    if (paths.length > 0) return paths;
+  }
+
+  const single = parseStringArg(args);
+  return [single];
 }
 
 /** `@WebSocketGateway({ namespace: 'chat' })` | `@WebSocketGateway(81, { namespace: '/chat' })` | `@WebSocketGateway()`. */

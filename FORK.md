@@ -32,6 +32,8 @@ Built-ins today:
 
 - `kerno-tsoa` — `@Route` + HTTP method decorators
 - `kerno-next-app-router` — `app/**/route.ts` HTTP exports (`function` / `const` / re-export)
+- `kerno-nestjs` — NestJS multi-prefix controllers, globalPrefix / URI versioning
+- `kerno-go` — Chi/gorilla Method/Methods, PathPrefix stacking
 
 No auto-discovery of arbitrary `node_modules` packages inside the agent sandbox.
 

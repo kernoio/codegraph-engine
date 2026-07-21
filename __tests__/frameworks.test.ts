@@ -247,7 +247,7 @@ describe('expressResolver.extract', () => {
   });
 });
 
-import { nestjsResolver } from '../src/resolution/frameworks/nestjs';
+import { nestjsResolver } from '../src/plugins/nestjs/resolver';
 
 describe('nestjsResolver.extract — HTTP', () => {
   it('joins @Controller prefix with @Get and links the handler', () => {
@@ -919,7 +919,7 @@ describe('Play routes file detection', () => {
   });
 });
 
-import { goResolver } from '../src/resolution/frameworks/go';
+import { goResolver } from '../src/plugins/go/resolver';
 
 describe('goResolver.extract', () => {
   it('extracts route from r.GET', () => {

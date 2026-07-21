@@ -7,8 +7,11 @@
 import { describe, expect, it } from 'vitest';
 import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
+import { nestjsResolver } from '../../src/plugins/nestjs/resolver';
+import { goResolver } from '../../src/plugins/go/resolver';
 import { reactResolver } from '../../src/resolution/frameworks/react';
 import { getBuiltInPlugins, getBuiltInPluginResolvers } from '../../src/plugins';
+import { getFrameworkResolver } from '../../src/resolution/frameworks';
 import {
   LIGHTHASH_SSH_CONTROLLER,
   TSOA_OFFICIAL_GET_CONTROLLER,
@@ -18,13 +21,20 @@ import {
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
-  it('exposes tsoa and next-app-router as built-ins', () => {
+  it('exposes built-in Kerno framework plugins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
-    expect(ids).toEqual(['kerno-next-app-router', 'kerno-tsoa']);
+    expect(ids).toEqual(['kerno-go', 'kerno-nestjs', 'kerno-next-app-router', 'kerno-tsoa']);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
+      'go',
+      'nestjs',
       'next-app-router',
       'tsoa',
     ]);
+  });
+
+  it('replaces stock nestjs and go resolvers in FRAMEWORK_RESOLVERS', () => {
+    expect(getFrameworkResolver('nestjs')).toBe(nestjsResolver);
+    expect(getFrameworkResolver('go')).toBe(goResolver);
   });
 });
 
