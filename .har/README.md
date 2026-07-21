@@ -17,7 +17,7 @@ Generated and maintained by [`har`](https://github.com/antoineFrau/har). Run `ha
 | `factory-line/` | Endpoint detection e2e cases + `run.mjs` orchestrator |
 | `runs/` | Run history from `har env` / MCP only — `.har/runs/YYYY-MM-DD/HH-mm-ss_<stageId>_agent-<id>.json` (gitignore) |
 | `artifacts/` | Stage outputs: reports, traces, screenshots, logs |
-| `agent-slot.sh` | Shared agent-id validation (reads limits from `harness.env`) |
+| `agent-slot.sh` | Shared agent-id validation (reads limits from `stages.json`, fallback `harness.env`) |
 | `setup-infra.sh` | Start optional Docker Compose stack + template database |
 | `launch.sh` | Launch one agent slot (git worktree by default, toolchain provisioning, env file) |
 | `provision-toolchain.sh` | Install deps and write toolchain paths (`PYTHON_BIN`, `NPM_BIN`, …) to `.env.agent.<id>` |

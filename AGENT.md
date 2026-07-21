@@ -27,6 +27,15 @@ FACTORY_LINE_CLONE=1 node .har/factory-line/run.mjs   # + shallow OSS repo clone
 
 Shell fallback when the CLI is not installed: `./.har/launch.sh 1`, `./.har/verify.sh 1 --full`.
 
+## Run history
+
+| Entry point | Writes `.har/runs/`? |
+|-------------|------------------------|
+| `./.har/*.sh` | No |
+| `har env …` / MCP | Yes — main checkout `.har/runs/YYYY-MM-DD/` |
+
+With worktree slots, code runs in the worktree; run JSON lives in the main repo `.har/runs/`.
+
 ## Definition of done (Kerno detectors)
 
 - `har env verify 1 --full` passes (includes `factory-line` stage)

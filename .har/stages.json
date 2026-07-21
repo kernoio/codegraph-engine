@@ -14,8 +14,7 @@
       "id": "setup-infra",
       "kind": "setup",
       "description": "Optional shared Docker infrastructure",
-      "command": "./.har/setup-infra.sh",
-      "artifacts": []
+      "command": "./.har/setup-infra.sh"
     },
     {
       "id": "launch",
@@ -63,8 +62,7 @@
       "id": "teardown",
       "kind": "teardown",
       "description": "Remove worktree and env file for the slot",
-      "command": "./.har/teardown.sh {agentId}",
-      "artifacts": []
+      "command": "./.har/teardown.sh {agentId}"
     },
     {
       "id": "factory-line",
