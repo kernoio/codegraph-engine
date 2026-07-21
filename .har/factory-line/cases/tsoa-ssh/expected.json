@@ -1,0 +1,5 @@
+{
+  "framework": "tsoa",
+  "source": "https://github.com/lightdash/lightdash — packages/backend/src/controllers/sshController.ts",
+  "routes": ["POST /api/v1/ssh/key-pairs"]
+}

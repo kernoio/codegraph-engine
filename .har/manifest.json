@@ -1,0 +1,27 @@
+{
+  "version": "1",
+  "generatorVersion": "0.4.0",
+  "outputDir": ".har",
+  "createdAt": "2026-07-21T14:05:23.211Z",
+  "updatedAt": "2026-07-21T14:05:23.211Z",
+  "adaptationSummary": "Adapt CLI harness for codegraph-engine: node build/test verify, factory-line endpoint detection e2e stage with 6 mini-repo cases",
+  "profile": "cli",
+  "fileChecksums": {
+    ".gitignore": "b64a9a51ef4b9666",
+    "CLAUDE.agent.md": "81741719309cc1a4",
+    "README.md": "83fa2d01ec32ceb5",
+    "STAGES.md": "286a75b2f9ce547a",
+    "agent-cli.sh": "726ff2115459bf0e",
+    "agent-slot.sh": "743c3f5a1153b84b",
+    "docker-compose.agent.yml": "6991f134a3ba81f9",
+    "harness.env": "9a7cd50b7b08cf93",
+    "justfile": "6415e7c5452eb2f9",
+    "launch.sh": "116160280c961e24",
+    "preflight.sh": "01d1a4398c8729ec",
+    "provision-toolchain.sh": "18cf04bd607f3fd8",
+    "setup-infra.sh": "68e44766e7aeee10",
+    "stages.json": "eb011cc0a24bc4ca",
+    "teardown.sh": "14917f84ef02434b",
+    "verify.sh": "2df9803e825fdede"
+  }
+}

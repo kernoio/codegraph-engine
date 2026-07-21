@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "description": "Endpoint detection factory line — mini-repo cases (full index) plus optional cloned OSS repos.",
+  "miniRepos": [
+    "tsoa-ssh",
+    "tsoa-get",
+    "next-health",
+    "next-signup",
+    "next-posts",
+    "django-users"
+  ],
+  "repos": [
+    {
+      "id": "express",
+      "url": "https://github.com/expressjs/express.git",
+      "shallow": true,
+      "minRoutes": 1,
+      "optional": true,
+      "note": "Stock Express resolver smoke — enable with FACTORY_LINE_CLONE=1"
+    }
+  ]
+}
