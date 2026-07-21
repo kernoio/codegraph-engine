@@ -1,5 +1,8 @@
 /**
  * In-repo CodeGraph plugin: Next.js App Router `route.ts` HTTP handlers.
+ *
+ * Endpoint benchmarks (SCIP parity) must count HTTP handlers only — see
+ * `isNextHttpRouteHandler` and `route-path.ts` for the page-vs-handler rule.
  */
 
 import type { CodeGraphPlugin } from '../../plugin-system/api';
@@ -17,4 +20,11 @@ const plugin: CodeGraphPlugin = {
 };
 
 export { nextAppRouterResolver };
+export {
+  filePathToAppRoute,
+  isNextHttpRouteHandler,
+  isNextPageRoute,
+  NEXT_ROUTE_KIND_HTTP,
+  NEXT_ROUTE_KIND_PAGE,
+} from './route-path';
 export default plugin;

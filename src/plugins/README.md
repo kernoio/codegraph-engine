@@ -31,3 +31,20 @@ Keep detector logic out of `src/resolution/frameworks/{react,nestjs,go}.ts`
 when a dedicated plugin can own it. Rebase upstream; re-apply only the
 registration loop in `frameworks/index.ts` plus any remaining Nest/Go
 hardenings until those become plugins too.
+
+## Next.js App Router — page UI vs HTTP handlers (#8)
+
+Stock `react` and `kerno-next-app-router` both emit `kind: route` nodes for
+different App Router layers:
+
+| Source | File | `name` | SCIP endpoint totals? |
+|--------|------|--------|----------------------|
+| `react` | `app/.../page.*` | `/dashboard` | No — UI navigation |
+| `kerno-next-app-router` | `app/.../route.ts` | `GET /api/health` | Yes |
+
+Implementation modules (`modules/**/route.ts`, formbricks-style) are **not**
+indexed — only paths under an `app/` segment are, so re-export stubs are not
+double-counted with their module implementations.
+
+Endpoint / aicore consumers should filter with `isNextHttpRouteHandler()` from
+`src/plugins/next-app-router/route-path.ts` rather than counting all route nodes.
