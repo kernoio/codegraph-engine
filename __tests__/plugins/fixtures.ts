@@ -133,3 +133,42 @@ export class CatsV1Controller {
   findAllV2() {}
 }
 `;
+
+/** https://github.com/mattermost/mattermost — server/channels/api4/user.go (InitUser) */
+export const MATTERMOST_USER_ROUTE_REGISTRATIONS = `
+func InitUser(api *API) {
+ api.BaseRoutes.Users.Handle("", api.APIHandler(createUser)).Methods(http.MethodPost)
+ api.BaseRoutes.Users.Handle("/ids", api.APISessionRequired(getUsersByIds)).Methods(http.MethodPost)
+ api.BaseRoutes.User.Handle("", api.APISessionRequired(getUser)).Methods(http.MethodGet)
+}
+`;
+
+/** https://github.com/mattermost/mattermost — server/channels/api4/api.go (Routes struct + PathPrefix) */
+export const MATTERMOST_API_ROUTES_STRUCT = `
+type Routes struct {
+ Users *mux.Router // 'api/v4/users'
+ User *mux.Router // 'api/v4/users/{user_id:[A-Za-z0-9]+}'
+}
+
+func Init(srv *Server) {
+ api.BaseRoutes.Users = api.BaseRoutes.ApiRoot.PathPrefix("/users").Subrouter()
+ api.BaseRoutes.User = api.BaseRoutes.ApiRoot.PathPrefix("/users/{user_id:[A-Za-z0-9]+}").Subrouter()
+}
+`;
+
+/** https://github.com/flipped-aurora/gin-vue-admin — server/router/example/exa_customer.go */
+export const GIN_VUE_ADMIN_GROUP_ROUTE = `
+func InitCustomerRouter(Router *gin.RouterGroup) {
+ customerRouter := Router.Group("customer")
+ {
+  customerRouter.POST("/customer", exaCustomerApi.CreateExaCustomer)
+  customerRouter.GET("/customer", exaCustomerApi.GetExaCustomer)
+ }
+}
+`;
+
+/** https://github.com/go-chi/chi — _examples/rest/rest.go (representative) */
+export const CHI_METHODS_ROUTE = `
+r.Method("GET", "/articles/{articleID}", getArticle)
+r.Methods([]string{"GET", "POST"}, "/search", searchArticles)
+`;

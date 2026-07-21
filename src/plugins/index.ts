@@ -11,8 +11,14 @@ import type { FrameworkResolver } from '../resolution/types';
 import tsoaPlugin, { tsoaResolver } from './tsoa';
 import nextAppRouterPlugin, { nextAppRouterResolver } from './next-app-router';
 import nestjsKernoPlugin, { nestjsKernoResolver } from './nestjs-kerno';
+import goHttpPlugin, { goHttpResolver } from './go-http';
 
-const BUILTIN_PLUGINS: CodeGraphPlugin[] = [tsoaPlugin, nextAppRouterPlugin, nestjsKernoPlugin];
+const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
+  tsoaPlugin,
+  nextAppRouterPlugin,
+  nestjsKernoPlugin,
+  goHttpPlugin,
+];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
   return BUILTIN_PLUGINS;
@@ -22,4 +28,4 @@ export function getBuiltInPluginResolvers(): FrameworkResolver[] {
   return BUILTIN_PLUGINS.flatMap((p) => p.resolvers ?? []);
 }
 
-export { tsoaResolver, nextAppRouterResolver, nestjsKernoResolver };
+export { tsoaResolver, nextAppRouterResolver, nestjsKernoResolver, goHttpResolver };

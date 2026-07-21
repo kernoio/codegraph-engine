@@ -23,10 +23,16 @@ import {
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
-  it('exposes tsoa, next-app-router, and nestjs as built-ins', () => {
+  it('exposes tsoa, next-app-router, nestjs, and go-http as built-ins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
-    expect(ids).toEqual(['kerno-nestjs', 'kerno-next-app-router', 'kerno-tsoa']);
+    expect(ids).toEqual([
+      'kerno-go-http',
+      'kerno-nestjs',
+      'kerno-next-app-router',
+      'kerno-tsoa',
+    ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
+      'go',
       'nestjs',
       'next-app-router',
       'tsoa',
