@@ -29,7 +29,7 @@ import { expoModulesResolver } from './expo-modules';
 import { fabricViewResolver } from './fabric';
 import { cicsResolver } from './cics';
 import { terraformResolver } from './terraform';
-import { tsoaResolver } from './tsoa';
+import { getBuiltInPluginResolvers } from '../../plugins';
 
 /**
  * All registered framework resolvers
@@ -42,7 +42,6 @@ const FRAMEWORK_RESOLVERS: FrameworkResolver[] = [
   expressResolver,
   nestjsResolver,
   reactResolver,
-  tsoaResolver,
   svelteResolver,
   vueResolver,
   astroResolver,
@@ -79,6 +78,14 @@ const FRAMEWORK_RESOLVERS: FrameworkResolver[] = [
   // Terraform / OpenTofu — disambiguate var/local/module/resource refs to same-dir module
   terraformResolver,
 ];
+
+// Kerno in-repo plugins (tsoa, next-app-router, …) — registered here so parse
+// workers importing this module see the same resolvers as the main thread.
+for (const resolver of getBuiltInPluginResolvers()) {
+  const index = FRAMEWORK_RESOLVERS.findIndex((r) => r.name === resolver.name);
+  if (index !== -1) FRAMEWORK_RESOLVERS.splice(index, 1);
+  FRAMEWORK_RESOLVERS.push(resolver);
+}
 
 /**
  * Get all framework resolvers
@@ -154,5 +161,5 @@ export { swiftObjcBridgeResolver } from './swift-objc';
 export { reactNativeBridgeResolver } from './react-native';
 export { expoModulesResolver } from './expo-modules';
 export { fabricViewResolver } from './fabric';
-export { tsoaResolver } from './tsoa';
 export { terraformResolver } from './terraform';
+export { tsoaResolver, nextAppRouterResolver } from '../../plugins';
