@@ -64,6 +64,52 @@ async function handler(req: NextRequest) {
 export const POST = handler;
 `;
 
+/** https://github.com/novuhq/novu — apps/api/src/app/widgets/widgets.controller.ts (trimmed) */
+export const NOVU_WIDGETS_CONTROLLER = `
+@ApiCommonResponses()
+@Controller('/widgets')
+export class WidgetsController {
+  @Post('/session/initialize')
+  async sessionInitialize(@Body() body: SessionInitializeRequestDto) {}
+
+  @Get('/notifications/feed')
+  async getNotificationsFeed() {}
+
+  @Get('/notifications/unseen')
+  async getUnseenCount() {}
+}
+`;
+
+/** https://github.com/twentyhq/twenty — packages/twenty-server/src/engine/core-modules/health/controllers/health.controller.ts */
+export const TWENTY_HEALTH_CONTROLLER = `
+@Controller('healthz')
+export class HealthController {
+  @Get()
+  @HealthCheck()
+  check() {
+    return this.health.check([]);
+  }
+}
+`;
+
+/** https://github.com/twentyhq/twenty — object-metadata.resolver.ts (@MetadataResolver + @ResolveField) */
+export const TWENTY_OBJECT_METADATA_RESOLVER = `
+@MetadataResolver(() => ObjectMetadataDTO)
+export class ObjectMetadataResolver {
+  @ResolveField(() => Boolean, {
+    deprecationReason: 'Use isUIEditable',
+  })
+  async isUIReadOnly(@Parent() objectMetadata: ObjectMetadataDTO): Promise<boolean> {
+    return !objectMetadata.isUIEditable;
+  }
+
+  @Query(() => [ObjectRecordCountDTO])
+  async objectRecordCounts(): Promise<ObjectRecordCountDTO[]> {
+    return [];
+  }
+}
+`;
+
 /** https://github.com/shadcn-ui/taxonomy — app/api/posts/route.ts */
 export const TAXONOMY_POSTS_ROUTE_FUNCTION = `
 export async function GET() {
@@ -72,5 +118,18 @@ export async function GET() {
 
 export async function POST() {
   return new Response(null, { status: 201 });
+}
+`;
+
+/** NestJS URI versioning — @Controller({ path, version }) + @Version on method */
+export const NEST_VERSIONED_CONTROLLER = `
+@Controller({ path: 'cats', version: '1' })
+export class CatsV1Controller {
+  @Get()
+  findAll() {}
+
+  @Version('2')
+  @Get('beta')
+  findAllV2() {}
 }
 `;

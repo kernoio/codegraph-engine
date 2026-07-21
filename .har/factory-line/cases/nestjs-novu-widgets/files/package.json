@@ -1,0 +1,6 @@
+{
+  "name": "nestjs-novu-widgets-fixture",
+  "dependencies": {
+    "@nestjs/common": "^10.0.0"
+  }
+}

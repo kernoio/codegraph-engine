@@ -1,0 +1,9 @@
+{
+  "framework": "nestjs",
+  "source": "https://github.com/novuhq/novu — apps/api/src/app/widgets/widgets.controller.ts",
+  "routes": [
+    "POST /widgets/session/initialize",
+    "GET /widgets/notifications/feed",
+    "GET /widgets/notifications/unseen"
+  ]
+}
