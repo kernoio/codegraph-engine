@@ -1,0 +1,5 @@
+{
+  "framework": "django",
+  "source": "Synthetic urls.py — stock Django resolver",
+  "routes": ["users/"]
+}

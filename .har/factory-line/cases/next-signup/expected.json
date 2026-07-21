@@ -1,0 +1,5 @@
+{
+  "framework": "next-app-router",
+  "source": "https://github.com/calcom/cal.com — apps/web/app/api/auth/signup/route.ts",
+  "routes": ["POST /api/auth/signup"]
+}

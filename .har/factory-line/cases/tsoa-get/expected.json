@@ -1,0 +1,5 @@
+{
+  "framework": "tsoa",
+  "source": "https://github.com/lukeautry/tsoa — tests/fixtures/controllers/getController.ts",
+  "routes": ["GET /GetTest", "GET /GetTest/{id}"]
+}
