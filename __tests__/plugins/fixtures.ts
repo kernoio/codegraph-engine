@@ -49,6 +49,54 @@ export class GetTestController extends Controller {
 }
 `;
 
+/** https://github.com/lukeautry/tsoa — tests/fixtures/controllers/rootController.ts */
+export const TSOA_OFFICIAL_ROOT_CONTROLLER = `
+import { Controller, Get, Route } from '@tsoa/runtime';
+
+@Route()
+export class RootController extends Controller {
+  @Get()
+  public async rootHandler(): Promise<void> {}
+}
+`;
+
+/** Inherited @Route prefix — child controller without its own @Route decorator. */
+export const TSOA_INHERITED_ROUTE_CONTROLLER = `
+import { Controller, Get, Post, Route } from '@tsoa/runtime';
+
+@Route('/api/v1/shared')
+export class SharedRoutesController extends Controller {
+  @Get('health')
+  public async health(): Promise<void> {}
+}
+
+export class ChildRoutesController extends SharedRoutesController {
+  @Post('widgets')
+  public async createWidget(): Promise<void> {}
+}
+`;
+
+/** https://github.com/lightdash/lightdash — packages/backend/src/controllers/userAvatarController.ts (trimmed) */
+export const LIGHTDASH_MULTI_ROUTE_FILE = `
+import { Delete, Get, Put, Route } from '@tsoa/runtime';
+import { BaseController } from './baseController';
+
+@Route('/api/v1/user/me/avatar')
+export class UserAvatarController extends BaseController {
+  @Put('/')
+  async updateAvatar(): Promise<void> {}
+
+  @Delete('/')
+  async deleteAvatar(): Promise<void> {}
+}
+
+@Route('/api/v1/users')
+export class UsersAvatarController extends BaseController {
+  @Get('/{userUuid}/avatar/{contentHash}')
+  async getAvatar(): Promise<void> {}
+}
+`;
+
 /** https://github.com/formbricks/formbricks — apps/web/app/api/v2/health/route.ts */
 export const FORMBRICKS_HEALTH_ROUTE_REEXPORT = `export { GET } from "@/modules/api/v2/health/route";
 `;

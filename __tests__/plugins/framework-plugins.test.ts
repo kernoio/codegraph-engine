@@ -14,6 +14,9 @@ import { getBuiltInPlugins, getBuiltInPluginResolvers } from '../../src/plugins'
 import {
   LIGHTHASH_SSH_CONTROLLER,
   TSOA_OFFICIAL_GET_CONTROLLER,
+  TSOA_OFFICIAL_ROOT_CONTROLLER,
+  TSOA_INHERITED_ROUTE_CONTROLLER,
+  LIGHTDASH_MULTI_ROUTE_FILE,
   FORMBRICKS_HEALTH_ROUTE_REEXPORT,
   CALCOM_SIGNUP_ROUTE_CONST,
   TAXONOMY_POSTS_ROUTE_FUNCTION,
@@ -68,6 +71,88 @@ describe('tsoa plugin (framework: tsoa)', () => {
     );
     const names = result.nodes.map((n) => n.name).sort();
     expect(names).toEqual(['GET /GetTest', 'GET /GetTest/{id}']);
+  });
+
+  it('extracts lukeautry/tsoa RootController (@Route() + @Get())', () => {
+    const result = tsoaResolver.extract!(
+      'tests/fixtures/controllers/rootController.ts',
+      TSOA_OFFICIAL_ROOT_CONTROLLER
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /']);
+  });
+
+  it('inherits @Route prefix for a child controller in the same file', () => {
+    const result = tsoaResolver.extract!(
+      'tests/fixtures/controllers/inheritedRouteController.ts',
+      TSOA_INHERITED_ROUTE_CONTROLLER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /api/v1/shared/health',
+      'POST /api/v1/shared/widgets',
+    ]);
+  });
+
+  it('extracts lightdash multi-class file with trailing-slash paths', () => {
+    const result = tsoaResolver.extract!(
+      'packages/backend/src/controllers/userAvatarController.ts',
+      LIGHTDASH_MULTI_ROUTE_FILE
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /api/v1/user/me/avatar/',
+      'GET /api/v1/users/{userUuid}/avatar/{contentHash}',
+      'PUT /api/v1/user/me/avatar/',
+    ]);
+  });
+
+  it('postExtract prepends inherited @Route from another file', () => {
+    const ctx = {
+      getAllFiles: () => ['base.ts', 'child.ts'],
+      readFile: (fp: string) => {
+        if (fp === 'base.ts') {
+          return `
+import { Controller, Get, Route } from '@tsoa/runtime';
+@Route('/api/v1/shared')
+export class SharedRoutesController extends Controller {
+  @Get('health')
+  public async health(): Promise<void> {}
+}
+`;
+        }
+        if (fp === 'child.ts') {
+          return `
+import { Post } from '@tsoa/runtime';
+import { SharedRoutesController } from './base';
+export class ChildRoutesController extends SharedRoutesController {
+  @Post('widgets')
+  public async createWidget(): Promise<void> {}
+}
+`;
+        }
+        return null;
+      },
+      getNodesInFile: (fp: string) => {
+        if (fp !== 'child.ts') return [];
+        return [
+          {
+            id: 'route:child.ts:5:POST:/widgets',
+            kind: 'route',
+            name: 'POST /widgets',
+            qualifiedName: 'child.ts::POST:/widgets',
+            filePath: 'child.ts',
+            startLine: 5,
+            endLine: 5,
+            startColumn: 0,
+            endColumn: 1,
+            language: 'typescript',
+            updatedAt: 0,
+          },
+        ];
+      },
+    } as any;
+
+    const updates = tsoaResolver.postExtract!(ctx);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.name).toBe('POST /api/v1/shared/widgets');
   });
 });
 
