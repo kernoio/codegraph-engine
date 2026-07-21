@@ -167,4 +167,5 @@ export {
   nextAppRouterResolver,
   nestjsKernoResolver,
   goHttpResolver,
+  phpHttpRoutesResolver,
 } from '../../plugins';

@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
+import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
 import { reactResolver } from '../../src/resolution/frameworks/react';
 import { getBuiltInPlugins, getBuiltInPluginResolvers } from '../../src/plugins';
 import {
@@ -20,19 +21,24 @@ import {
   TWENTY_HEALTH_CONTROLLER,
   TWENTY_OBJECT_METADATA_RESOLVER,
   NEST_VERSIONED_CONTROLLER,
+  APPWRITE_LOCALE_ROUTES,
+  APPWRITE_PLATFORM_VCS_CREATE,
+  FIREFLY_PASSPORT_ROUTES,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
-  it('exposes tsoa, next-app-router, nestjs, and go-http as built-ins', () => {
+  it('exposes all Kerno built-in framework plugins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
       'kerno-go-http',
       'kerno-nestjs',
       'kerno-next-app-router',
+      'kerno-php-http-routes',
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
       'go',
+      'laravel',
       'nestjs',
       'next-app-router',
       'tsoa',
@@ -180,5 +186,55 @@ describe('nestjs plugin (framework: NestJS)', () => {
     const updates = nestjsKernoResolver.postExtract!(ctx as any);
     expect(updates).toHaveLength(1);
     expect(updates[0]!.name).toBe('GET /api/users');
+  });
+});
+
+describe('php-http-routes plugin (framework: Laravel + Utopia HTTP)', () => {
+  it('extracts appwrite Http::get/post routes', () => {
+    const result = phpHttpRoutesResolver.extract!(
+      'app/controllers/api/locale.php',
+      APPWRITE_LOCALE_ROUTES
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /v1/locale',
+      'GET /v1/locale/codes',
+      'POST /v1/locale/currencies',
+    ]);
+  });
+
+  it('extracts appwrite Platform setHttpMethod/setHttpPath routes', () => {
+    const result = phpHttpRoutesResolver.extract!(
+      'src/Appwrite/Platform/Modules/Functions/Http/Deployments/Vcs/Create.php',
+      APPWRITE_PLATFORM_VCS_CREATE
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual([
+      'POST /v1/functions/:functionId/deployments/vcs',
+    ]);
+  });
+
+  it('extracts firefly-iii Route:: with uses-array handler syntax', () => {
+    const result = phpHttpRoutesResolver.extract!('routes/web.php', FIREFLY_PASSPORT_ROUTES);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /personal-access-tokens/{token_id}',
+      'GET /personal-access-tokens',
+      'POST /personal-access-tokens',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'OAuthController@destroyPersonalAccessToken',
+      'OAuthController@listPersonalAccessTokens',
+      'OAuthController@storePersonalAccessToken',
+    ]);
+  });
+
+  it('extracts Laravel Route:: tuple and Controller@action syntax', () => {
+    const src = `
+Route::get('/users', [UserController::class, 'index']);
+Route::post('/users', 'UserController@store');
+Route::resource('users', UserController::class);
+`;
+    const result = phpHttpRoutesResolver.extract!('routes/web.php', src);
+    expect(result.nodes.map((n) => n.name)).toContain('GET /users');
+    expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
+    expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
   });
 });

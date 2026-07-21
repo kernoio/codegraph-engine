@@ -172,3 +172,45 @@ export const CHI_METHODS_ROUTE = `
 r.Method("GET", "/articles/{articleID}", getArticle)
 r.Methods([]string{"GET", "POST"}, "/search", searchArticles)
 `;
+
+/** https://github.com/appwrite/appwrite — app/controllers/api/locale.php */
+export const APPWRITE_LOCALE_ROUTES = `
+Http::get('/v1/locale')
+    ->desc('Get user locale')
+    ->groups(['api', 'locale'])
+    ->action(function () {});
+
+Http::get('/v1/locale/codes')
+    ->desc('List locale codes')
+    ->groups(['api', 'locale'])
+    ->action(function () {});
+
+Http::post('/v1/locale/currencies')
+    ->desc('List currencies')
+    ->groups(['api', 'locale'])
+    ->action(function () {});
+`;
+
+/** https://github.com/appwrite/appwrite — src/Appwrite/Platform/Modules/Functions/Http/Deployments/Vcs/Create.php */
+export const APPWRITE_PLATFORM_VCS_CREATE = `
+class Create extends Base
+{
+    use HTTP;
+
+    public function __construct()
+    {
+        $this
+            ->setHttpMethod(Action::HTTP_REQUEST_METHOD_POST)
+            ->setHttpPath('/v1/functions/:functionId/deployments/vcs')
+            ->desc('Create VCS deployment')
+            ->callback($this->action(...));
+    }
+}
+`;
+
+/** https://github.com/firefly-iii/firefly-iii — routes/web.php (Passport group) */
+export const FIREFLY_PASSPORT_ROUTES = `
+Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@storePersonalAccessToken', 'as' => 'personal.tokens.store']);
+Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
+Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
+`;
