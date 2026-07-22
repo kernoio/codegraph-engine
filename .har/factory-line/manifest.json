@@ -33,7 +33,8 @@
     "http4s-todo",
     "tornado-string-service",
     "akka-http-users",
-    "pyramid-benchmarker"
+    "pyramid-benchmarker",
+    "bottle-crud"
   ],
   "repos": [
     {
@@ -211,6 +212,14 @@
       "minRoutes": 2,
       "optional": true,
       "note": "Akka HTTP microservice sample \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "kumiko",
+      "url": "https://github.com/njean42/kumiko.git",
+      "shallow": true,
+      "minRoutes": 2,
+      "optional": true,
+      "note": "Bottle @route server \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

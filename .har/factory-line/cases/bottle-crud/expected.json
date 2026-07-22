@@ -1,0 +1,12 @@
+{
+  "framework": "bottle",
+  "source": "edsonlead/bottle_crud — project/controllers/controller.py",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /",
+    "GET /create",
+    "GET /delete/{no}",
+    "GET /index",
+    "GET /update/{no}"
+  ]
+}

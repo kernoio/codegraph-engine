@@ -47,6 +47,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CodeGraph now detects **Tornado** HTTP routes from `Application` URLSpec tables — tuple handlers, `url()` / `URLSpec()`, regex path params, and same-file RequestHandler verb methods — so endpoint queries cover Tornado services.
 - CodeGraph now detects **Akka HTTP** and **Pekko HTTP** Scala routes — including `path` / `pathPrefix` nesting, method directives, `concat` / `~` alternatives, and `&` conjunctions — so endpoint queries cover Akka/Pekko HTTP services.
 - CodeGraph now detects **Pyramid** HTTP routes — including `config.add_route` / `config.add_view`, `@view_config` attachments, and `request_method` predicates — so endpoint queries cover Pyramid services. (#43)
+- CodeGraph now detects **Bottle** HTTP routes — including `@route` / `@get`/`@post`/`@put`/`@patch`/`@delete`, explicit `Bottle()` app decorators, multi-method `method=` lists, and `callback=` registration — so endpoint queries cover Bottle services.
 
 ### Fixes
 
