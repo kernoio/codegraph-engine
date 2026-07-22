@@ -1,0 +1,12 @@
+{
+  "framework": "http4s",
+  "source": "https://github.com/jaspervz/todo-http4s-doobie — src/main/scala/service/TodoService.scala",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /todos/{id}",
+    "GET /todos",
+    "GET /todos/{id}",
+    "POST /todos",
+    "PUT /todos/{id}"
+  ]
+}

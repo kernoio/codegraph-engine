@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { http4sResolver, parseHttp4sPath } from '../../src/plugins/http4s/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,6 +33,9 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  HTTP4S_TODO_SERVICE,
+  HTTP4S_METARANK_ROUTES,
+  HTTP4S_PETSTORE_AUTH_ENDPOINTS,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -39,6 +43,7 @@ describe('in-repo plugin registry', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
       'kerno-go-http',
+      'kerno-http4s',
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
@@ -46,6 +51,7 @@ describe('in-repo plugin registry', () => {
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
       'go',
+      'http4s',
       'laravel',
       'nestjs',
       'next-app-router',
@@ -372,5 +378,104 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('http4s plugin (framework: http4s)', () => {
+  it('detects org.http4s in build.sbt and not unrelated Scala projects', () => {
+    const positive = {
+      fileExists: () => false,
+      readFile: (fp: string) =>
+        fp === 'build.sbt'
+          ? `libraryDependencies += "org.http4s" %% "http4s-dsl" % "0.23.30"`
+          : null,
+      getAllFiles: () => ['build.sbt'],
+      getProjectRoot: () => '/test',
+      getNodesInFile: () => [],
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: () => [],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    expect(http4sResolver.detect!(positive as any)).toBe(true);
+
+    const negative = {
+      ...positive,
+      readFile: (fp: string) =>
+        fp === 'build.sbt' ? `libraryDependencies += "com.typesafe.play" %% "play" % "2.8.0"` : null,
+    };
+    expect(http4sResolver.detect!(negative as any)).toBe(false);
+  });
+
+  it('extracts jaspervz/todo-http4s-doobie TodoService routes', () => {
+    const result = http4sResolver.extract!(
+      'src/main/scala/service/TodoService.scala',
+      HTTP4S_TODO_SERVICE
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /todos/{id}',
+      'GET /todos',
+      'GET /todos/{id}',
+      'POST /todos',
+      'PUT /todos/{id}',
+    ]);
+  });
+
+  it('extracts metarank HttpRoutes.of routes with binders and query matchers', () => {
+    const result = http4sResolver.extract!(
+      'src/main/scala/ai/metarank/api/routes/Apis.scala',
+      HTTP4S_METARANK_ROUTES
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /health',
+      'POST /rank/{model}',
+      'POST /train/{modelName}',
+    ]);
+  });
+
+  it('extracts scala-pet-store AuthEndpoint partials (asAuthed + :?)', () => {
+    const result = http4sResolver.extract!(
+      'src/main/scala/.../PetEndpoints.scala',
+      HTTP4S_PETSTORE_AUTH_ENDPOINTS
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /{id}',
+      'GET /findByStatus',
+      'GET /{id}',
+      'POST /',
+    ]);
+    expect(result.references.map((r) => r.referenceName)).toEqual(
+      expect.arrayContaining([
+        'createPetEndpoint',
+        'getPetEndpoint',
+        'findPetsByStatusEndpoint',
+        'deletePetEndpoint',
+      ])
+    );
+  });
+
+  it('parses path shapes: Root, literals, typed vars, extension, /:', () => {
+    expect(parseHttp4sPath('Root')).toBe('/');
+    expect(parseHttp4sPath('Root / "hello" / name')).toBe('/hello/{name}');
+    expect(parseHttp4sPath('Root / "todos" / LongVar(id)')).toBe('/todos/{id}');
+    expect(parseHttp4sPath('Root / file ~ "json"')).toBe('/{file}.json');
+    expect(parseHttp4sPath('"hello" /: rest')).toBe('/hello/{*rest}');
+    expect(parseHttp4sPath('Root / "x" :? Foo(a) asAuthed _')).toBe('/x');
+  });
+
+  it('emits one route per verb for method concatenation', () => {
+    const src = `
+import org.http4s.dsl.io._
+import org.http4s.HttpRoutes
+val routes = HttpRoutes.of[IO] {
+  case GET | POST -> Root / "search" => Ok()
+}
+`;
+    const result = http4sResolver.extract!('Routes.scala', src);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /search',
+      'POST /search',
+    ]);
   });
 });

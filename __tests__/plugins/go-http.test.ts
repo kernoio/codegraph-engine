@@ -20,11 +20,22 @@ import {
 import type { Node } from '../../src/types';
 
 describe('in-repo plugin registry', () => {
-  it('exposes go-http alongside tsoa and next-app-router', () => {
+  it('exposes go-http alongside other Kerno built-in plugins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
-    expect(ids).toEqual(['kerno-go-http', 'kerno-next-app-router', 'kerno-tsoa']);
+    expect(ids).toContain('kerno-go-http');
+    expect(ids).toEqual([
+      'kerno-go-http',
+      'kerno-http4s',
+      'kerno-nestjs',
+      'kerno-next-app-router',
+      'kerno-php-http-routes',
+      'kerno-tsoa',
+    ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
       'go',
+      'http4s',
+      'laravel',
+      'nestjs',
       'next-app-router',
       'tsoa',
     ]);

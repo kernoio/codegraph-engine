@@ -9,7 +9,8 @@
     "next-posts",
     "next-endpoint-scope",
     "django-users",
-    "nestjs-novu-widgets"
+    "nestjs-novu-widgets",
+    "http4s-todo"
   ],
   "repos": [
     {
@@ -19,6 +20,14 @@
       "minRoutes": 1,
       "optional": true,
       "note": "Stock Express resolver smoke — enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "todo-http4s-doobie",
+      "url": "https://github.com/jaspervz/todo-http4s-doobie.git",
+      "shallow": true,
+      "minRoutes": 5,
+      "optional": true,
+      "note": "http4s DSL TodoService — enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }
