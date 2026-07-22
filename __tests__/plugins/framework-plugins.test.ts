@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { elysiaResolver } from '../../src/plugins/elysia/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,12 +33,17 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  ELYSIA_NOTES_API,
+  ELYSIA_REALWORLD_USERS,
+  ELYSIA_CONVERTX_HEALTHCHECK,
+  ELYSIA_AUTH_GROUP,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
   it('exposes all Kerno built-in framework plugins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
+      'kerno-elysia',
       'kerno-go-http',
       'kerno-nestjs',
       'kerno-next-app-router',
@@ -45,6 +51,7 @@ describe('in-repo plugin registry', () => {
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
+      'elysia',
       'go',
       'laravel',
       'nestjs',
@@ -372,5 +379,96 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('elysia plugin (framework: Elysia)', () => {
+  it('extracts notes-api prefix + chained verbs with :param → {param}', () => {
+    const result = elysiaResolver.extract!('src/note.ts', ELYSIA_NOTES_API);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /note/{index}',
+      'GET /note',
+      'GET /note/{index}',
+      'PATCH /note/{index}',
+      'PUT /note',
+    ]);
+  });
+
+  it('extracts realworld .group(prefix, guard, cb) routes', () => {
+    const result = elysiaResolver.extract!(
+      'src/users/users.controller.ts',
+      ELYSIA_REALWORLD_USERS
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /user',
+      'POST /users',
+      'POST /users/login',
+      'PUT /user',
+    ]);
+  });
+
+  it('extracts ConvertX healthcheck chained .get()', () => {
+    const result = elysiaResolver.extract!(
+      'src/pages/healthcheck.tsx',
+      ELYSIA_CONVERTX_HEALTHCHECK
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /healthcheck']);
+  });
+
+  it('extracts .group(prefix, cb) without guard object', () => {
+    const result = elysiaResolver.extract!(
+      'src/auth/infrastructure/auth.controller.ts',
+      ELYSIA_AUTH_GROUP
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'POST /auth/login',
+      'POST /auth/register',
+    ]);
+  });
+
+  it('emits references for named handlers and .route() custom verbs', () => {
+    const src = `
+import { Elysia } from 'elysia';
+function listUsers() { return []; }
+function searchUsers() { return []; }
+new Elysia({ prefix: '/api' })
+  .get('/users', listUsers)
+  .route('M-SEARCH', '/users', searchUsers);
+`;
+    const result = elysiaResolver.extract!('src/app.ts', src);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /api/users',
+      'M-SEARCH /api/users',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'listUsers',
+      'searchUsers',
+    ]);
+  });
+
+  it('detects elysia via package.json and rejects unrelated projects', () => {
+    const positive = {
+      fileExists: () => false,
+      readFile: (fp: string) =>
+        fp === 'package.json' ? JSON.stringify({ dependencies: { elysia: '^1.0.0' } }) : null,
+      getProjectRoot: () => '/proj',
+      getAllFiles: () => ['package.json'],
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: () => [],
+      getNodesInFile: () => [],
+      iterateNodesByKind: () => [][Symbol.iterator](),
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    expect(elysiaResolver.detect(positive as any)).toBe(true);
+
+    const negative = {
+      ...positive,
+      readFile: (fp: string) =>
+        fp === 'package.json' ? JSON.stringify({ dependencies: { express: '^4.0.0' } }) : null,
+      getAllFiles: () => ['package.json', 'src/index.ts'],
+    };
+    expect(elysiaResolver.detect(negative as any)).toBe(false);
   });
 });

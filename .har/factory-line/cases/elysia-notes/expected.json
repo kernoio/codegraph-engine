@@ -1,0 +1,12 @@
+{
+  "framework": "elysia",
+  "source": "https://github.com/michaelphillips4/notes-api — src/note.ts",
+  "routes": [
+    "GET /note",
+    "PUT /note",
+    "GET /note/{index}",
+    "DELETE /note/{index}",
+    "PATCH /note/{index}"
+  ],
+  "endpointScope": "http-handler"
+}
