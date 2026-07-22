@@ -34,7 +34,9 @@
     "tornado-string-service",
     "akka-http-users",
     "pyramid-benchmarker",
-    "bottle-crud"
+    "bottle-crud",
+    "falcon-things",
+    "falcon-asgilook"
   ],
   "repos": [
     {

@@ -1,0 +1,6 @@
+{
+  "framework": "falcon",
+  "source": "falconry/falcon — examples/things.py",
+  "endpointScope": "http-handler",
+  "routes": ["GET /things"]
+}

@@ -1,0 +1,11 @@
+{
+  "framework": "falcon",
+  "source": "falconry/falcon — examples/asgilook/asgilook/{app,images}.py",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /images",
+    "GET /images/{image_id:uuid}.jpeg",
+    "GET /thumbnails/{image_id:uuid}/{width:int}x{height:int}.jpeg",
+    "POST /images"
+  ]
+}

@@ -49,6 +49,8 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CodeGraph now detects **Pyramid** HTTP routes — including `config.add_route` / `config.add_view`, `@view_config` attachments, and `request_method` predicates — so endpoint queries cover Pyramid services. (#43)
 - CodeGraph now detects **Bottle** HTTP routes — including `@route` / `@get`/`@post`/`@put`/`@patch`/`@delete`, explicit `Bottle()` app decorators, multi-method `method=` lists, and `callback=` registration — so endpoint queries cover Bottle services.
 
+- CodeGraph now detects **Falcon** HTTP routes — including `falcon.App` / legacy `falcon.API` / ASGI `falcon.asgi.App` `add_route` registrations, URI templates, and suffixed responders — so endpoint queries cover Falcon services.
+
 ### Fixes
 
 - TypeScript, TSX, and JavaScript files now parse with up-to-date grammars — modern syntax such as `using` declarations and import attributes no longer trips parse errors that could drop surrounding symbols. (The previously bundled grammars dated from 2023.)
