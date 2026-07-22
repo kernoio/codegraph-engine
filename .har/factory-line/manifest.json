@@ -14,7 +14,8 @@
     "hono-blog",
     "ktor-widgets",
     "sinatra-pizzerias",
-    "grape-statuses"
+    "grape-statuses",
+    "symfony-blog"
   ],
   "repos": [
     {
@@ -56,6 +57,14 @@
       "minRoutes": 5,
       "optional": true,
       "note": "Grape mount/prefix smoke \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "symfony-demo",
+      "url": "https://github.com/symfony/demo.git",
+      "shallow": true,
+      "minRoutes": 5,
+      "optional": true,
+      "note": "Symfony attribute routes \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

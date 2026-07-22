@@ -21,6 +21,9 @@ import ktorPlugin, { ktorResolver } from './ktor';
 import sinatraGrapePlugin, { sinatraGrapeResolver } from './sinatra-grape';
 
 
+import symfonyPlugin, { symfonyResolver } from './symfony';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -30,6 +33,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   honoPlugin,
   ktorPlugin,
   sinatraGrapePlugin,
+  symfonyPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -49,4 +53,5 @@ export {
   honoResolver,
   ktorResolver,
   sinatraGrapeResolver,
+  symfonyResolver,
 };

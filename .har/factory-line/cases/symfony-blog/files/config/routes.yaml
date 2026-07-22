@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=../vendor/symfony/routing/Loader/schema/routing.schema.json
+# Concrete YAML route — https://github.com/symfony/demo config/routes.yaml (homepage shape)
+
+homepage:
+    path: /
+    controller: App\Controller\DefaultController::index
+    methods: [GET]
+
+controllers:
+    resource: ../src/Controller/
+    type: attribute
