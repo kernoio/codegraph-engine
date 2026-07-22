@@ -42,6 +42,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CodeGraph now detects **Vert.x Web** HTTP routes — including verb helpers (`router.get/post/...`), `route(HttpMethod, path)`, and nested routers via `mountSubRouter` / `.subRouter` — so endpoint queries cover Vert.x services.
 - CodeGraph now detects **Remix** and **React Router** framework-mode HTTP routes — including `app/routes.ts` helpers (`route` / `index` / `prefix` / `layout`), file-convention modules, and `loader`/`action` handlers — so endpoint queries cover framework-mode apps that the data-router extractor missed.
 - CodeGraph now detects **FastEndpoints** HTTP routes — including `Configure()` shorthand verbs, `Verbs()`/`Routes()` multi-mapping, class-level `[HttpGet]`/`[HttpPost]` attributes, and `Group<>` route prefixes — so endpoint queries cover FastEndpoints services.
+- CodeGraph now detects **Elysia** HTTP routes — including chained `.get()`/`.post()` methods, `.group()` prefixes (with optional guards), instance `prefix` options, and `.route()` custom verbs — so endpoint queries cover Bun-native Elysia services.
 
 ### Fixes
 

@@ -1,0 +1,6 @@
+{
+  "name": "elysia-notes-fixture",
+  "dependencies": {
+    "elysia": "^1.0.0"
+  }
+}

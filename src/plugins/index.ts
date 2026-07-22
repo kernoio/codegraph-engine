@@ -63,6 +63,9 @@ import remixPlugin, { remixResolver } from './remix';
 import fastEndpointsPlugin, { fastEndpointsResolver } from './fastendpoints';
 
 
+import elysiaPlugin, { elysiaResolver } from './elysia';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -86,6 +89,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   vertxWebPlugin,
   remixPlugin,
   fastEndpointsPlugin,
+  elysiaPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -119,4 +123,5 @@ export {
   vertxWebResolver,
   remixResolver,
   fastEndpointsResolver,
+  elysiaResolver,
 };

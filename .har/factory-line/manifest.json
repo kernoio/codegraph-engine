@@ -28,7 +28,8 @@
     "adonisjs-learn",
     "vertx-simple-rest",
     "remix-healthz",
-    "fastendpoints-auth"
+    "fastendpoints-auth",
+    "elysia-notes"
   ],
   "repos": [
     {
@@ -174,6 +175,14 @@
       "minRoutes": 3,
       "optional": true,
       "note": "FastEndpoints Group + Configure() \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "convertx",
+      "url": "https://github.com/C4illin/ConvertX.git",
+      "shallow": true,
+      "minRoutes": 5,
+      "optional": true,
+      "note": "Elysia plugin smoke \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

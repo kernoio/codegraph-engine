@@ -2426,4 +2426,115 @@ public class SaveUserEndpoint : Endpoint<UserRequest>
 
     public override async Task HandleAsync(UserRequest req, CancellationToken ct) { }
 }
+/** https://github.com/michaelphillips4/notes-api — src/note.ts */
+export const ELYSIA_NOTES_API = `
+import { Elysia, t } from "elysia";
+
+export const note = new Elysia({ prefix: "/note" })
+  .decorate("note", { data: [] as string[] })
+  .get("/", ({ note }) => note.data)
+  .put("/", ({ note, body: { data } }) => note.data.push(data), {
+    body: t.Object({ data: t.String() }),
+  })
+  .get("/:index", ({ note, params: { index } }) => note.data[index])
+  .delete("/:index", ({ note, params: { index } }) => note.data.splice(index, 1))
+  .patch("/:index", ({ note, params: { index }, body: { data } }) => {
+    note.data[index] = data;
+  }, { body: t.Object({ data: t.String() }) });
+`;
+
+/**
+ * https://github.com/bedstack/elysia-drizzle-realworld-example —
+ * src/users/users.controller.ts (trimmed)
+ */
+export const ELYSIA_REALWORLD_USERS = `
+import { Elysia } from 'elysia';
+import { setupUsers } from '@/users/users.module';
+
+export const usersController = new Elysia()
+  .use(setupUsers)
+  .group(
+    '/users',
+    {
+      detail: {
+        tags: ['Auth'],
+      },
+    },
+    (app) =>
+      app
+        .post(
+          '',
+          async ({ body, store, status }) => {
+            const user = await store.usersService.createUser(body.user);
+            return status(201, user);
+          },
+        )
+        .post(
+          '/login',
+          ({ body, store }) =>
+            store.usersService.loginUser(body.user.email, body.user.password),
+        ),
+  )
+  .group(
+    '/user',
+    {
+      detail: {
+        tags: ['User'],
+      },
+    },
+    (app) =>
+      app
+        .get(
+          '',
+          async ({ request, store }) =>
+            store.usersService.findById(
+              await store.authService.getUserIdFromHeader(request.headers),
+            ),
+        )
+        .put(
+          '',
+          async ({ request, store, body }) =>
+            store.usersService.updateUser(
+              await store.authService.getUserIdFromHeader(request.headers),
+              body.user,
+            ),
+        ),
+  );
+`;
+
+/** https://github.com/C4illin/ConvertX — src/pages/healthcheck.tsx */
+export const ELYSIA_CONVERTX_HEALTHCHECK = `
+import Elysia from "elysia";
+import { userService } from "./user";
+
+export const healthcheck = new Elysia().use(userService).get(
+  "/healthcheck",
+  () => {
+    return { status: "ok" };
+  },
+  {
+    auth: false,
+  },
+);
+`;
+
+/**
+ * https://github.com/lukas-andre/bun-elysia-clean-architecture-example —
+ * src/auth/infrastructure/auth.controller.ts (trimmed) — `.group` without guard object
+ */
+export const ELYSIA_AUTH_GROUP = `
+import Elysia from 'elysia';
+import { loginUseCase, registerUseCase } from '../application/login.usecase';
+
+export const AuthController = new Elysia().group('/auth', (app) =>
+  app
+    .post('/register', async ({ body, set }) => {
+      const newUser = await registerUseCase(body);
+      set.status = 201;
+      return { status: 'success', data: newUser };
+    })
+    .post('/login', async ({ body }) => {
+      return loginUseCase(body);
+    }),
+);
 `;
