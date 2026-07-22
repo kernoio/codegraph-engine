@@ -24,7 +24,8 @@
     "aiohttp-polls",
     "sanic-api",
     "hapi-users",
-    "litestar-translator"
+    "litestar-translator",
+    "adonisjs-learn"
   ],
   "repos": [
     {
@@ -138,6 +139,14 @@
       "minRoutes": 6,
       "optional": true,
       "note": "Litestar TranslatorController \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "lets-learn-adonisjs-6",
+      "url": "https://github.com/adocasts/lets-learn-adonisjs-6.git",
+      "shallow": true,
+      "minRoutes": 10,
+      "optional": true,
+      "note": "AdonisJS v6 routes \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

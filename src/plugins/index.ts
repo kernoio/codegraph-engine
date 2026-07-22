@@ -51,6 +51,9 @@ import hapiPlugin, { hapiResolver } from './hapi';
 import litestarPlugin, { litestarResolver } from './litestar';
 
 
+import adonisjsPlugin, { adonisjsResolver } from './adonisjs';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -70,6 +73,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   sanicPlugin,
   hapiPlugin,
   litestarPlugin,
+  adonisjsPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -99,4 +103,5 @@ export {
   sanicResolver,
   hapiResolver,
   litestarResolver,
+  adonisjsResolver,
 };

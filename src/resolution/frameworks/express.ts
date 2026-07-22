@@ -52,14 +52,18 @@ export const expressResolver: FrameworkResolver = {
   languages: ['javascript', 'typescript'],
 
   detect(context: ResolutionContext): boolean {
+    // AdonisJS owns `router.get` / `Route.get` — kerno-adonisjs claims those
+    // projects. Detected-but-silent (or double-emitting unprefixed routes) is
+    // worse than staying out.
+    if (isAdonisProject(context)) return false;
+
     // Check for Express in package.json
     const packageJson = context.readFile('package.json');
     if (packageJson) {
       try {
         const pkg = JSON.parse(packageJson);
         const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-        // Fastify / Hapi are owned by kerno-fastify / kerno-hapi plugins —
-        // do not claim them here (detected-but-silent is worse than not detecting).
+        // Fastify / Hapi / Adonis are owned by dedicated plugins.
         if (deps.express || deps.koa) {
           return true;
         }
@@ -77,7 +81,11 @@ export const expressResolver: FrameworkResolver = {
         file.includes('middleware')
       ) {
         const content = context.readFile(file);
-        if (content && (content.includes('express') || content.includes('app.get') || content.includes('router.get'))) {
+        if (
+          content &&
+          !isAdonisRouteSource(content) &&
+          (content.includes('express') || content.includes('app.get') || content.includes('router.get'))
+        ) {
           return true;
         }
       }
@@ -135,6 +143,8 @@ export const expressResolver: FrameworkResolver = {
 
   extract(filePath, content) {
     if (!/\.(m?js|tsx?|cjs)$/.test(filePath)) return { nodes: [], references: [] };
+    // Belt-and-suspenders: never emit Express routes from Adonis route files.
+    if (isAdonisRouteSource(content)) return { nodes: [], references: [] };
     const nodes: Node[] = [];
     const references: UnresolvedRef[] = [];
     const now = Date.now();
@@ -325,6 +335,42 @@ function resolveServiceMethod(
   if (methodNodes.length > 0) return methodNodes[0]!.id;
 
   return null;
+}
+
+/** True when the project is AdonisJS (owned by kerno-adonisjs). */
+function isAdonisProject(context: ResolutionContext): boolean {
+  const packageJson = context.readFile('package.json');
+  if (packageJson) {
+    try {
+      const pkg = JSON.parse(packageJson);
+      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+      if (
+        deps['@adonisjs/core'] ||
+        deps['@adonisjs/http-server'] ||
+        Object.keys(deps).some((k) => k.startsWith('@adonisjs/'))
+      ) {
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return (
+    context.fileExists('adonisrc.ts') ||
+    context.fileExists('adonisrc.js') ||
+    context.fileExists('.adonisrc.json') ||
+    context.fileExists('ace') ||
+    context.fileExists('ace.js')
+  );
+}
+
+function isAdonisRouteSource(content: string): boolean {
+  return (
+    /@adonisjs\/core\/services\/router/.test(content) ||
+    /@adonisjs\/http-server/.test(content) ||
+    /@ioc:Adonis\/Core\/Route/.test(content) ||
+    /@adonisjs\/core\/http/.test(content)
+  );
 }
 
 /**
