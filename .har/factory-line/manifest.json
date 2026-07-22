@@ -29,7 +29,8 @@
     "vertx-simple-rest",
     "remix-healthz",
     "fastendpoints-auth",
-    "elysia-notes"
+    "elysia-notes",
+    "http4s-todo"
   ],
   "repos": [
     {
@@ -183,6 +184,14 @@
       "minRoutes": 5,
       "optional": true,
       "note": "Elysia plugin smoke \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "todo-http4s-doobie",
+      "url": "https://github.com/jaspervz/todo-http4s-doobie.git",
+      "shallow": true,
+      "minRoutes": 5,
+      "optional": true,
+      "note": "http4s DSL TodoService \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

@@ -2174,6 +2174,56 @@ public class AccountServer extends AbstractVerticle {
     router.get("/account").produces("application/json").handler(rc -> {});
     router.post("/account").produces("application/json").handler(rc -> {});
     router.delete("/account/:id").handler(rc -> {});
+/** https://github.com/jaspervz/todo-http4s-doobie — src/main/scala/service/TodoService.scala */
+export const HTTP4S_TODO_SERVICE = `
+package service
+
+import cats.effect.IO
+import org.http4s.dsl.Http4sDsl
+import org.http4s.{HttpRoutes, Uri}
+import repository.TodoRepository
+
+class TodoService(repository: TodoRepository) extends Http4sDsl[IO] {
+  val routes = HttpRoutes.of[IO] {
+    case GET -> Root / "todos" =>
+      Ok()
+
+    case GET -> Root / "todos" / LongVar(id) =>
+      Ok()
+
+    case req @ POST -> Root / "todos" =>
+      Created()
+
+    case req @ PUT -> Root / "todos" / LongVar(id) =>
+      Ok()
+
+    case DELETE -> Root / "todos" / LongVar(id) =>
+      NoContent()
+  }
+}
+`;
+
+/** https://github.com/metarank/metarank — src/main/scala/ai/metarank/api/routes/TrainApi.scala + HealthApi.scala */
+export const HTTP4S_METARANK_ROUTES = `
+package ai.metarank.api.routes
+
+import cats.effect.IO
+import org.http4s.dsl.io._
+import org.http4s.HttpRoutes
+
+case class TrainApi() {
+  def routes = HttpRoutes.of[IO] { case POST -> Root / "train" / modelName =>
+    Ok()
+  }
+}
+
+case class HealthApi() {
+  val routes = HttpRoutes.of[IO] { case GET -> Root / "health" => Ok() }
+}
+
+case class RankApi() {
+  val routes = HttpRoutes.of[IO] {
+    case post @ POST -> Root / "rank" / model :? ExplainParamDecoder(explain) => Ok()
   }
 }
 `;
@@ -2537,4 +2587,36 @@ export const AuthController = new Elysia().group('/auth', (app) =>
       return loginUseCase(body);
     }),
 );
+`;
+ * https://github.com/pauljamescleary/scala-pet-store —
+ * src/main/scala/io/github/pauljamescleary/petstore/infrastructure/endpoint/PetEndpoints.scala
+ * (AuthEndpoint partials + asAuthed; path vars + query matchers)
+ */
+export const HTTP4S_PETSTORE_AUTH_ENDPOINTS = `
+package io.github.pauljamescleary.petstore.infrastructure.endpoint
+
+import org.http4s.dsl.Http4sDsl
+import tsec.authentication._
+
+class PetEndpoints[F[_]] extends Http4sDsl[F] {
+  private def createPetEndpoint(): AuthEndpoint[F, Auth] = {
+    case req @ POST -> Root asAuthed _ =>
+      Ok()
+  }
+
+  private def getPetEndpoint(): AuthEndpoint[F, Auth] = {
+    case GET -> Root / LongVar(id) asAuthed _ =>
+      Ok()
+  }
+
+  private def findPetsByStatusEndpoint(): AuthEndpoint[F, Auth] = {
+    case GET -> Root / "findByStatus" :? StatusMatcher(Valid(xs)) asAuthed _ =>
+      Ok()
+  }
+
+  private def deletePetEndpoint(): AuthEndpoint[F, Auth] = {
+    case DELETE -> Root / LongVar(id) asAuthed _ =>
+      Ok()
+  }
+}
 `;
