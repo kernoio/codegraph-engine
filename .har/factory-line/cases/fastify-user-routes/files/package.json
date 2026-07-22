@@ -1,0 +1,6 @@
+{
+  "name": "fastify-user-routes-fixture",
+  "dependencies": {
+    "fastify": "^5.0.0"
+  }
+}

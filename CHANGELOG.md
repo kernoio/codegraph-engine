@@ -29,6 +29,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CodeGraph now detects **Ktor** HTTP routes — including nested `route` prefixes, verb helpers (`get`/`post`/`put`/`patch`/`delete`/…), and path segments without a leading slash — so endpoint queries cover Ktor services. (#24)
 - CodeGraph now detects **Sinatra** and **Grape** HTTP routes — including Sinatra namespaces, Grape `resource`/`route_param`/`prefix`, path versioning, and mounted API prefixes — so endpoint queries cover common Ruby API apps. (#26)
 - CodeGraph now detects **Symfony** HTTP routes — including `#[Route]` attributes, legacy `@Route` annotations, and YAML/XML route tables — so endpoint queries cover Symfony apps and bundles.
+- CodeGraph now detects **Fastify** HTTP routes — including shorthand methods, `route({ method, url })` declarations, and prefixed `register()` encapsulation — so endpoint queries cover Fastify services.
 
 ### Fixes
 
