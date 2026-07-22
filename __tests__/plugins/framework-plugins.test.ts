@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { micronautResolver } from '../../src/plugins/micronaut/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,6 +33,12 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  KESTRA_MISC_CONTROLLER,
+  KESTRA_CLUSTER_CONTROLLER,
+  KESTRA_KV_CONTROLLER,
+  ASC_LAB_HELLO_CONTROLLER,
+  ASC_LAB_OFFER_GATEWAY_CONTROLLER,
+  MILL_MICRONAUT_HELLO_KT,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -39,6 +46,7 @@ describe('in-repo plugin registry', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
       'kerno-go-http',
+      'kerno-micronaut',
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
@@ -47,6 +55,7 @@ describe('in-repo plugin registry', () => {
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
       'go',
       'laravel',
+      'micronaut',
       'nestjs',
       'next-app-router',
       'tsoa',
@@ -372,5 +381,132 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('micronaut plugin (framework: Micronaut)', () => {
+  it('extracts kestra MiscController (@Get path + @Post uri=)', () => {
+    const result = micronautResolver.extract!(
+      'webserver/src/main/java/io/kestra/webserver/controllers/api/MiscController.java',
+      KESTRA_MISC_CONTROLLER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /api/v1/configs',
+      'GET /api/v1/configs/login',
+      'GET /api/v1/{tenant}/usages/all',
+      'POST /api/v1/login',
+      'POST /api/v1/{tenant}/basicAuth',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'createBasicAuth',
+      'getConfiguration',
+      'getLoginConfiguration',
+      'getUsages',
+      'login',
+    ]);
+  });
+
+  it('extracts kestra ClusterController (relative method path without leading slash)', () => {
+    const result = micronautResolver.extract!(
+      'webserver/src/main/java/io/kestra/webserver/controllers/api/ClusterController.java',
+      KESTRA_CLUSTER_CONTROLLER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /api/v1/{tenant}/cluster/metrics/{serviceType}',
+      'GET /api/v1/{tenant}/cluster/services/{id}',
+    ]);
+  });
+
+  it('extracts kestra KVController (Get/Put/Delete + uri= + consumes media type)', () => {
+    const result = micronautResolver.extract!(
+      'webserver/src/main/java/io/kestra/webserver/controllers/api/KVController.java',
+      KESTRA_KV_CONTROLLER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /api/v1/{tenant}/namespaces/{namespace}/kv',
+      'DELETE /api/v1/{tenant}/namespaces/{namespace}/kv/{key}',
+      'GET /api/v1/{tenant}/kv',
+      'GET /api/v1/{tenant}/namespaces/{namespace}/kv/{key}',
+      'PUT /api/v1/{tenant}/namespaces/{namespace}/kv/{key}',
+    ]);
+  });
+
+  it('extracts asc-lab HelloController (bare @Get defaults to controller prefix)', () => {
+    const result = micronautResolver.extract!(
+      'policy-service/src/main/java/pl/altkom/asc/lab/micronaut/poc/policy/infrastructure/adapters/web/HelloController.java',
+      ASC_LAB_HELLO_CONTROLLER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /hello',
+      'GET /hello/version',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual(['index', 'version']);
+  });
+
+  it('extracts asc-lab OfferGatewayController (@Post value=/ + consumes)', () => {
+    const result = micronautResolver.extract!(
+      'agent-portal-gateway/src/main/java/pl/altkom/asc/lab/micronaut/poc/gateway/OfferGatewayController.java',
+      ASC_LAB_OFFER_GATEWAY_CONTROLLER
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(['POST /api/offers']);
+    expect(result.references.map((r) => r.referenceName)).toEqual(['create']);
+  });
+
+  it('extracts mill Kotlin HelloController (bare @Get + @Produces)', () => {
+    const result = micronautResolver.extract!(
+      'micronaut/src/HelloController.kt',
+      MILL_MICRONAUT_HELLO_KT
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /hello']);
+    expect(result.references.map((r) => r.referenceName)).toEqual(['index']);
+  });
+
+  it('detects Micronaut via build.gradle and rejects Spring-only projects', () => {
+    const micronautCtx = {
+      getAllFiles: () => ['build.gradle', 'src/main/java/App.java'],
+      readFile: (fp: string) => {
+        if (fp === 'build.gradle') {
+          return `dependencies { implementation("io.micronaut:micronaut-http-server-netty") }`;
+        }
+        return null;
+      },
+      fileExists: () => false,
+      getProjectRoot: () => '/mn',
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: () => [],
+      iterateNodesByKind: () => [][Symbol.iterator](),
+      getNodesInFile: () => [],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    expect(micronautResolver.detect(micronautCtx as any)).toBe(true);
+
+    const springCtx = {
+      ...micronautCtx,
+      getAllFiles: () => ['pom.xml', 'src/main/java/App.java'],
+      readFile: (fp: string) => {
+        if (fp === 'pom.xml') {
+          return `<dependency><groupId>org.springframework.boot</groupId></dependency>`;
+        }
+        return `import org.springframework.web.bind.annotation.RestController;\n@RestController\nclass App {}`;
+      },
+    };
+    expect(micronautResolver.detect(springCtx as any)).toBe(false);
+  });
+
+  it('does not extract Spring @GetMapping as Micronaut routes', () => {
+    const spring = `
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UsersController {
+  @GetMapping("/users")
+  public String list() { return ""; }
+}
+`;
+    const result = micronautResolver.extract!('UsersController.java', spring);
+    expect(result.nodes).toEqual([]);
   });
 });

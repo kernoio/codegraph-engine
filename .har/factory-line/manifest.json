@@ -9,7 +9,8 @@
     "next-posts",
     "next-endpoint-scope",
     "django-users",
-    "nestjs-novu-widgets"
+    "nestjs-novu-widgets",
+    "micronaut-kestra-misc"
   ],
   "repos": [
     {
@@ -19,6 +20,14 @@
       "minRoutes": 1,
       "optional": true,
       "note": "Stock Express resolver smoke — enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "asc-lab-micronaut-poc",
+      "url": "https://github.com/asc-lab/micronaut-microservices-poc.git",
+      "shallow": true,
+      "minRoutes": 2,
+      "optional": true,
+      "note": "Micronaut controllers — enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }
