@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { sinatraGrapeResolver } from '../../src/plugins/sinatra-grape/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,6 +33,12 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  LAMERNEWS_SINATRA_ROUTES,
+  PIZZA_SINATRA_NAMESPACE_ROUTES,
+  GRAPE_README_TWITTER_API,
+  GRAPE_ON_RACK_PING,
+  GRAPE_ON_RACK_API_MOUNT,
+  GRAPE_ON_RACK_POST_PUT,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -42,6 +49,7 @@ describe('in-repo plugin registry', () => {
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
+      'kerno-sinatra-grape',
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
@@ -49,6 +57,7 @@ describe('in-repo plugin registry', () => {
       'laravel',
       'nestjs',
       'next-app-router',
+      'sinatra-grape',
       'tsoa',
     ]);
   });
@@ -372,5 +381,99 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('sinatra-grape plugin (framework: Sinatra + Grape)', () => {
+  it('extracts lamernews top-level Sinatra DSL routes', () => {
+    const result = sinatraGrapeResolver.extract!('app.rb', LAMERNEWS_SINATRA_ROUTES);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /api/getnews/{sort}/{start}/{count}',
+      'GET /latest/{start}',
+      'POST /api/submit',
+    ]);
+  });
+
+  it('extracts stevekinney/pizza nested Sinatra namespaces', () => {
+    const result = sinatraGrapeResolver.extract!(
+      'api/v1/pizzerias.rb',
+      PIZZA_SINATRA_NAMESPACE_ROUTES
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /api/v1/pizzerias',
+      'GET /api/v1/pizzerias/{id}',
+      'GET /api/v1/properties/search',
+    ]);
+  });
+
+  it('extracts grape README Twitter API (header version ignored, resource + route_param)', () => {
+    const result = sinatraGrapeResolver.extract!('api/twitter.rb', GRAPE_README_TWITTER_API);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /api/statuses/{id}',
+      'GET /api/statuses/home_timeline',
+      'GET /api/statuses/public_timeline',
+      'GET /api/statuses/{id}',
+      'POST /api/statuses',
+      'PUT /api/statuses/{id}',
+    ]);
+  });
+
+  it('extracts grape-on-rack symbol paths', () => {
+    const result = sinatraGrapeResolver.extract!('api/post_put.rb', GRAPE_ON_RACK_POST_PUT);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /ring',
+      'POST /ring',
+      'PUT /ring',
+    ]);
+  });
+
+  it('postExtract applies Grape mount parent prefix', () => {
+    const ping = sinatraGrapeResolver.extract!('api/ping.rb', GRAPE_ON_RACK_PING);
+    const files = new Map<string, string>([
+      ['api/ping.rb', GRAPE_ON_RACK_PING],
+      ['app/api.rb', GRAPE_ON_RACK_API_MOUNT],
+      ['Gemfile', "gem 'grape'\n"],
+    ]);
+    const ctx = {
+      getAllFiles: () => [...files.keys()],
+      readFile: (p: string) => files.get(p) ?? null,
+      fileExists: (p: string) => files.has(p),
+      getNodesByKind: (kind: string) => (kind === 'route' ? ping.nodes : []),
+      iterateNodesByKind: (kind: string) =>
+        kind === 'route' ? ping.nodes[Symbol.iterator]() : [][Symbol.iterator](),
+      getNodesByName: () => [],
+      getNodesInFile: () => [],
+      getImportMappings: () => [],
+    };
+    const updates = sinatraGrapeResolver.postExtract!(ctx as any);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.name).toBe('GET /api/ping');
+  });
+
+  it('detects Sinatra/Grape via Gemfile and rejects unrelated Ruby projects', () => {
+    const sinatraCtx = {
+      readFile: (p: string) => (p === 'Gemfile' ? "gem 'sinatra'\n" : null),
+      fileExists: () => false,
+      getAllFiles: () => ['Gemfile'],
+      getNodesByKind: () => [],
+      getNodesByName: () => [],
+      getNodesInFile: () => [],
+      getImportMappings: () => [],
+    };
+    expect(sinatraGrapeResolver.detect(sinatraCtx as any)).toBe(true);
+
+    const grapeCtx = {
+      ...sinatraCtx,
+      readFile: (p: string) => (p === 'Gemfile' ? "gem 'grape'\n" : null),
+    };
+    expect(sinatraGrapeResolver.detect(grapeCtx as any)).toBe(true);
+
+    const railsOnlyCtx = {
+      ...sinatraCtx,
+      readFile: (p: string) => (p === 'Gemfile' ? "gem 'rails'\n" : null),
+      getAllFiles: () => ['Gemfile', 'config/routes.rb'],
+    };
+    expect(sinatraGrapeResolver.detect(railsOnlyCtx as any)).toBe(false);
   });
 });

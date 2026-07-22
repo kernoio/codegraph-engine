@@ -262,3 +262,158 @@ Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers
 Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
 Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
+
+/** https://github.com/antirez/lamernews — app.rb (trimmed top-level Sinatra DSL) */
+export const LAMERNEWS_SINATRA_ROUTES = `
+require 'sinatra'
+require 'json'
+
+get '/' do
+  'top'
+end
+
+get '/latest/:start' do
+  'latest'
+end
+
+post '/api/submit' do
+  'submit'
+end
+
+get  '/api/getnews/:sort/:start/:count' do
+  'news'
+end
+`;
+
+/** https://github.com/stevekinney/pizza — api/v1/pizzerias.rb (nested Sinatra::Namespace) */
+export const PIZZA_SINATRA_NAMESPACE_ROUTES = `
+require 'sinatra'
+require 'sinatra/namespace'
+
+class API < Sinatra::Base
+  configure do
+    register Sinatra::Namespace
+  end
+
+  namespace '/api' do
+    namespace '/v1' do
+      get '/pizzerias' do
+        content_type :json
+        '[]'
+      end
+
+      get '/pizzerias/:id' do
+        content_type :json
+        json = '{}'
+        if json == 'null'
+          raise Sinatra::NotFound
+        else
+          json
+        end
+      end
+
+      get '/properties/search' do
+        content_type :json
+        '[]'
+      end
+    end
+  end
+end
+`;
+
+/**
+ * https://github.com/ruby-grape/grape — README Twitter API example (trimmed).
+ * Header versioning must NOT appear in the path; prefix + resource + route_param do.
+ */
+export const GRAPE_README_TWITTER_API = `
+module Twitter
+  class API < Grape::API
+    version 'v1', using: :header, vendor: 'twitter'
+    format :json
+    prefix :api
+
+    helpers do
+      def current_user
+        nil
+      end
+    end
+
+    resource :statuses do
+      desc 'Return a public timeline.'
+      get :public_timeline do
+        []
+      end
+
+      desc 'Return a personal timeline.'
+      get :home_timeline do
+        []
+      end
+
+      desc 'Return a status.'
+      params do
+        requires :id, type: Integer
+      end
+      route_param :id do
+        get do
+          {}
+        end
+      end
+
+      desc 'Create a status.'
+      post do
+        {}
+      end
+
+      desc 'Update a status.'
+      put ':id' do
+        {}
+      end
+
+      desc 'Delete a status.'
+      delete ':id' do
+        {}
+      end
+    end
+  end
+end
+`;
+
+/** https://github.com/ruby-grape/grape-on-rack — api/ping.rb + app/api.rb mount/prefix */
+export const GRAPE_ON_RACK_PING = `
+module Acme
+  class Ping < Grape::API
+    format :json
+    get '/ping' do
+      { ping: 'pong' }
+    end
+  end
+end
+`;
+
+export const GRAPE_ON_RACK_API_MOUNT = `
+module Acme
+  class API < Grape::API
+    prefix 'api'
+    format :json
+    mount ::Acme::Ping
+  end
+end
+`;
+
+/** https://github.com/ruby-grape/grape-on-rack — api/post_put.rb (symbol paths) */
+export const GRAPE_ON_RACK_POST_PUT = `
+module Acme
+  class PostPut < Grape::API
+    format :json
+    get :ring do
+      { rang: 0 }
+    end
+    post :ring do
+      { rang: 1 }
+    end
+    put :ring do
+      { rang: 2 }
+    end
+  end
+end
+`;

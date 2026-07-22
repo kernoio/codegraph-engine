@@ -1,0 +1,13 @@
+{
+  "framework": "grape",
+  "source": "ruby-grape/grape — README Twitter API example",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /api/statuses/{id}",
+    "GET /api/statuses/home_timeline",
+    "GET /api/statuses/public_timeline",
+    "GET /api/statuses/{id}",
+    "POST /api/statuses",
+    "PUT /api/statuses/{id}"
+  ]
+}
