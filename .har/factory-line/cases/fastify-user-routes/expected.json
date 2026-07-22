@@ -1,0 +1,11 @@
+{
+  "framework": "fastify",
+  "source": "https://github.com/hmake98/fastify-typescript — src/routes/user.router.ts + src/main.ts register prefix",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /",
+    "GET /health",
+    "POST /api/user/login",
+    "POST /api/user/signup"
+  ]
+}

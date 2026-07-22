@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { fastifyResolver } from '../../src/plugins/fastify/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,12 +33,17 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  FASTIFY_DEMO_TASKS_ROUTES,
+  HMAKE_FASTIFY_USER_ROUTER,
+  FASTIFY_ROUTE_PREFIX_EXAMPLE,
+  FASTIFY_ROUTE_OBJECT,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
   it('exposes all Kerno built-in framework plugins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
+      'kerno-fastify',
       'kerno-go-http',
       'kerno-nestjs',
       'kerno-next-app-router',
@@ -45,6 +51,7 @@ describe('in-repo plugin registry', () => {
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
+      'fastify',
       'go',
       'laravel',
       'nestjs',
@@ -372,5 +379,118 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('fastify plugin (framework: Fastify)', () => {
+  it('detects fastify dependency and ignores express-only projects', () => {
+    const positive = {
+      readFile: (fp: string) =>
+        fp === 'package.json' ? JSON.stringify({ dependencies: { fastify: '^5.0.0' } }) : null,
+      getAllFiles: () => ['package.json'],
+      fileExists: () => false,
+    } as any;
+    expect(fastifyResolver.detect(positive)).toBe(true);
+
+    const negative = {
+      readFile: (fp: string) =>
+        fp === 'package.json' ? JSON.stringify({ dependencies: { express: '^4.0.0' } }) : null,
+      getAllFiles: () => ['package.json', 'src/app.js'],
+      fileExists: () => false,
+    } as any;
+    expect(fastifyResolver.detect(negative)).toBe(false);
+  });
+
+  it('extracts fastify/demo task CRUD shorthand routes', () => {
+    const result = fastifyResolver.extract!(
+      'src/routes/api/tasks/index.ts',
+      FASTIFY_DEMO_TASKS_ROUTES
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /:id',
+      'GET /',
+      'GET /:id',
+      'PATCH /:id',
+      'POST /',
+    ]);
+  });
+
+  it('extracts hmake98 user router with named handler references', () => {
+    const result = fastifyResolver.extract!(
+      'src/routes/user.router.ts',
+      HMAKE_FASTIFY_USER_ROUTER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'POST /login',
+      'POST /signup',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'controllers.login',
+      'controllers.signUp',
+    ]);
+  });
+
+  it('applies same-file register() prefixes (fastify route-prefix example)', () => {
+    const result = fastifyResolver.extract!(
+      'examples/route-prefix.js',
+      FASTIFY_ROUTE_PREFIX_EXAMPLE
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /english/hello',
+      'GET /italian/hello',
+    ]);
+  });
+
+  it('extracts fastify.route({ method, url|path }) including method arrays', () => {
+    const result = fastifyResolver.extract!('test/route.3.test.js', FASTIFY_ROUTE_OBJECT);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /foo/:an_id',
+      'PATCH /items/:id',
+      'PUT /items/:id',
+    ]);
+    expect(result.references.map((r) => r.referenceName)).toContain('updateItem');
+  });
+
+  it('postExtract prepends cross-file register() prefixes', () => {
+    const loginRoute = {
+      id: 'route:src/routes/user.router.ts:10:POST:/login',
+      kind: 'route' as const,
+      name: 'POST /login',
+      qualifiedName: 'src/routes/user.router.ts::route:POST:/login',
+      filePath: 'src/routes/user.router.ts',
+      language: 'typescript' as const,
+      startLine: 10,
+      endLine: 10,
+      startColumn: 0,
+      endColumn: 0,
+      updatedAt: 0,
+    };
+    const ctx = {
+      getNodesInFile: () => [loginRoute],
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: (kind: string) => (kind === 'route' ? [loginRoute] : []),
+      iterateNodesByKind: (kind: string) =>
+        kind === 'route' ? [loginRoute][Symbol.iterator]() : [][Symbol.iterator](),
+      fileExists: () => true,
+      readFile: (fp: string) => {
+        if (fp === 'src/main.ts') {
+          return `
+import fastify from 'fastify';
+import userRouter from './routes/user.router';
+const server = fastify();
+server.register(userRouter, { prefix: '/api/user' });
+`;
+        }
+        return null;
+      },
+      getProjectRoot: () => '/test',
+      getAllFiles: () => ['src/main.ts', 'src/routes/user.router.ts'],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    const updates = fastifyResolver.postExtract!(ctx as any);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.name).toBe('POST /api/user/login');
   });
 });

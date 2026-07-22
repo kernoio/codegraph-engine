@@ -9,7 +9,8 @@
     "next-posts",
     "next-endpoint-scope",
     "django-users",
-    "nestjs-novu-widgets"
+    "nestjs-novu-widgets",
+    "fastify-user-routes"
   ],
   "repos": [
     {
@@ -19,6 +20,14 @@
       "minRoutes": 1,
       "optional": true,
       "note": "Stock Express resolver smoke — enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "fastify-typescript",
+      "url": "https://github.com/hmake98/fastify-typescript.git",
+      "shallow": true,
+      "minRoutes": 4,
+      "optional": true,
+      "note": "Fastify shorthand + register prefix — enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }
