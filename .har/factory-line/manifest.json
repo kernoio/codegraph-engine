@@ -20,7 +20,8 @@
     "jaxrs-quarkus-fruits",
     "micronaut-kestra-misc",
     "koa-blog-users",
-    "slim-skeleton-users"
+    "slim-skeleton-users",
+    "aiohttp-polls"
   ],
   "repos": [
     {
@@ -102,6 +103,14 @@
       "minRoutes": 3,
       "optional": true,
       "note": "Slim 4 skeleton \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "aiohttp-demos",
+      "url": "https://github.com/aio-libs/aiohttp-demos.git",
+      "shallow": true,
+      "minRoutes": 4,
+      "optional": true,
+      "note": "Official aiohttp demos \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

@@ -1,0 +1,11 @@
+{
+  "framework": "aiohttp",
+  "source": "aio-libs/aiohttp-demos — demos/polls/aiohttpdemo_polls/routes.py",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /",
+    "GET /poll/{question_id}",
+    "GET /poll/{question_id}/results",
+    "POST /poll/{question_id}/vote"
+  ]
+}

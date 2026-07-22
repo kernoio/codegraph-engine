@@ -39,6 +39,9 @@ import koaPlugin, { koaResolver } from './koa';
 import slimPlugin, { slimResolver } from './slim';
 
 
+import aiohttpPlugin, { aiohttpResolver } from './aiohttp';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -54,6 +57,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   micronautPlugin,
   koaPlugin,
   slimPlugin,
+  aiohttpPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -79,4 +83,5 @@ export {
   micronautResolver,
   koaResolver,
   slimResolver,
+  aiohttpResolver,
 };
