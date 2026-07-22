@@ -42,11 +42,13 @@ START=$(now_ms)
 
 # Endpoint detection factory line: plugin vitest + mini-repo full-index cases.
 # Optional OSS clones: FACTORY_LINE_CLONE=1 or pass --clone-repos to run.mjs.
+# Always run the worktree's run.mjs — har may invoke this stage script from the
+# main checkout's .har/, and run.mjs derives REPO_ROOT from its own location.
 set +e
 OUTPUT=$(
   cd "$WORK_DIR" && \
   FACTORY_LINE_ARTIFACTS="$ARTIFACTS_DIR" \
-  "${NODE_BIN:-node}" "$HARNESS_DIR/factory-line/run.mjs" 2>&1
+  "${NODE_BIN:-node}" "$WORK_DIR/.har/factory-line/run.mjs" 2>&1
 )
 EXIT_CODE=$?
 set -e

@@ -183,10 +183,16 @@ if [ -n "$FULL" ]; then
   # Registered verification stages from .har/stages.json (see .har/STAGES.md).
   # Every stage listed in verificationStages with a registered script/command
   # runs here -- stage templates and custom stages alike.
+  # Prefer the session worktree's stage scripts/cases when verifying a worktree
+  # slot — har often invokes this verify.sh from the main checkout's .har/.
+  STAGE_HARNESS_DIR="$SCRIPT_DIR"
+  if [ -d "${WORK_DIR}/.har/stages" ]; then
+    STAGE_HARNESS_DIR="${WORK_DIR}/.har"
+  fi
   while IFS=$'\t' read -r STAGE_ID STAGE_CMD; do
     [ -n "$STAGE_ID" ] || continue
     run_step "$STAGE_ID" "$STAGE_CMD" || true
-  done < <(list_registered_verification_stage_commands "$SCRIPT_DIR" "$AGENT_ID")
+  done < <(list_registered_verification_stage_commands "$STAGE_HARNESS_DIR" "$AGENT_ID")
 fi
 
 END_TOTAL=$(now_ms)

@@ -20,14 +20,13 @@ import {
 import type { Node } from '../../src/types';
 
 describe('in-repo plugin registry', () => {
-  it('exposes go-http alongside tsoa and next-app-router', () => {
+  it('exposes go-http alongside other built-in framework plugins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
-    expect(ids).toEqual(['kerno-go-http', 'kerno-next-app-router', 'kerno-tsoa']);
-    expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
-      'go',
-      'next-app-router',
-      'tsoa',
-    ]);
+    expect(ids).toContain('kerno-go-http');
+    expect(ids).toContain('kerno-koa');
+    expect(ids).toContain('kerno-tsoa');
+    expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toContain('go');
+    expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toContain('koa');
   });
 });
 

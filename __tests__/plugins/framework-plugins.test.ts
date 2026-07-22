@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { koaResolver } from '../../src/plugins/koa/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,6 +33,10 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  KOA_EXAMPLES_BLOG_APP,
+  KAILS_USERS_ROUTES,
+  KAILS_ARTICLES_ROUTES,
+  KOA_NESTED_MOUNT_EXAMPLE,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -39,6 +44,7 @@ describe('in-repo plugin registry', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
       'kerno-go-http',
+      'kerno-koa',
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
@@ -46,6 +52,7 @@ describe('in-repo plugin registry', () => {
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
       'go',
+      'koa',
       'laravel',
       'nestjs',
       'next-app-router',
@@ -372,5 +379,127 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('koa plugin (framework: Koa / @koa/router)', () => {
+  it('detects @koa/router dependency and ignores express-only projects', () => {
+    const positive = {
+      readFile: (fp: string) =>
+        fp === 'package.json'
+          ? JSON.stringify({ dependencies: { koa: '^2.0.0', '@koa/router': '^12.0.0' } })
+          : null,
+      getAllFiles: () => ['package.json'],
+      fileExists: () => false,
+    } as any;
+    expect(koaResolver.detect(positive)).toBe(true);
+
+    const negative = {
+      readFile: (fp: string) =>
+        fp === 'package.json' ? JSON.stringify({ dependencies: { express: '^4.0.0' } }) : null,
+      getAllFiles: () => ['package.json', 'src/app.js'],
+      fileExists: () => false,
+    } as any;
+    expect(koaResolver.detect(negative)).toBe(false);
+  });
+
+  it('extracts koajs/examples blog chained routes with named handlers', () => {
+    const result = koaResolver.extract!('blog/app.js', KOA_EXAMPLES_BLOG_APP);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /post/:id',
+      'GET /post/new',
+      'POST /post',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'add',
+      'create',
+      'list',
+      'show',
+    ]);
+  });
+
+  it('applies constructor prefix (embbnux/kails users routes)', () => {
+    const result = koaResolver.extract!('app/routes/users.js', KAILS_USERS_ROUTES);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /users',
+      'GET /users/logout',
+      'GET /users/sign_in',
+      'POST /users/sign_in',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'users.LogIn',
+      'users.LogOut',
+      'users.index',
+      'users.signIn',
+    ]);
+  });
+
+  it('applies constructor prefix and last-handler refs (kails articles)', () => {
+    const result = koaResolver.extract!('app/routes/articles.js', KAILS_ARTICLES_ROUTES);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /articles/:id',
+      'GET /articles/:id/edit',
+      'GET /articles/new',
+      'POST /articles',
+      'PUT /articles/:id',
+    ]);
+    expect(result.references.map((r) => r.referenceName)).toContain('articles.show');
+    expect(result.references.map((r) => r.referenceName)).toContain('articles.create');
+  });
+
+  it('applies same-file nested .use() mount prefixes', () => {
+    const result = koaResolver.extract!('routes.js', KOA_NESTED_MOUNT_EXAMPLE);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /api/users',
+      'GET /api/users/:id',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'getUser',
+      'getUsers',
+    ]);
+  });
+
+  it('postExtract prepends cross-file .use() mount prefixes', () => {
+    const signInRoute = {
+      id: 'route:app/routes/users.js:8:GET:/users/sign_in',
+      kind: 'route' as const,
+      name: 'GET /users/sign_in',
+      qualifiedName: 'app/routes/users.js::route:GET:/users/sign_in',
+      filePath: 'app/routes/users.js',
+      language: 'javascript' as const,
+      startLine: 8,
+      endLine: 8,
+      startColumn: 0,
+      endColumn: 0,
+      updatedAt: 0,
+    };
+    const ctx = {
+      getNodesInFile: () => [signInRoute],
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: (kind: string) => (kind === 'route' ? [signInRoute] : []),
+      iterateNodesByKind: (kind: string) =>
+        kind === 'route' ? [signInRoute][Symbol.iterator]() : [][Symbol.iterator](),
+      fileExists: () => true,
+      readFile: (fp: string) => {
+        if (fp === 'app/index.js') {
+          return `
+import Router from '@koa/router';
+import users from './routes/users';
+const api = new Router({ prefix: '/api' });
+api.use(users.routes());
+`;
+        }
+        return null;
+      },
+      getProjectRoot: () => '/test',
+      getAllFiles: () => ['app/index.js', 'app/routes/users.js'],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    const updates = koaResolver.postExtract!(ctx as any);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.name).toBe('GET /api/users/sign_in');
   });
 });
