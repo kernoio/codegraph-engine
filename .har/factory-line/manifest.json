@@ -11,7 +11,8 @@
     "django-users",
     "nestjs-novu-widgets",
     "fiber-auth-jwt",
-    "hono-blog"
+    "hono-blog",
+    "ktor-widgets"
   ],
   "repos": [
     {
@@ -37,6 +38,14 @@
       "minRoutes": 5,
       "optional": true,
       "note": "Hono official examples \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "ktor-exposed-starter",
+      "url": "https://github.com/raharrison/kotlin-ktor-exposed-starter.git",
+      "shallow": true,
+      "minRoutes": 5,
+      "optional": true,
+      "note": "Ktor routing DSL \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

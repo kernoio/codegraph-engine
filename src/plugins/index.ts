@@ -15,6 +15,9 @@ import goHttpPlugin, { goHttpResolver } from './go-http';
 import phpHttpRoutesPlugin, { phpHttpRoutesResolver } from './php-http-routes';
 import honoPlugin, { honoResolver } from './hono';
 
+import ktorPlugin, { ktorResolver } from './ktor';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -22,6 +25,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   goHttpPlugin,
   phpHttpRoutesPlugin,
   honoPlugin,
+  ktorPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -39,4 +43,5 @@ export {
   goHttpResolver,
   phpHttpRoutesResolver,
   honoResolver,
+  ktorResolver,
 };
