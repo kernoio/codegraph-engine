@@ -39,6 +39,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CodeGraph now detects **Hapi** HTTP routes — including `server.route` object and array forms, method arrays, catch-all `*`, and `register` route prefixes — so endpoint queries cover Hapi services. Express no longer silently claims `@hapi/hapi` / `hapi` dependencies. (#28)
 - CodeGraph now detects **Litestar** HTTP routes — including `@get`/`@post`/… semantic decorators, `@route(http_method=…)`, `Controller.path` prefixes, typed path params, and `Router(path=…)` mounts — so endpoint queries cover Litestar services.
 - CodeGraph now detects **AdonisJS** HTTP routes — including `Route`/`router` verb helpers, nested `.group().prefix()` stacks, and `resource()` / `apiOnly` / `only` / `params` — so endpoint queries cover AdonisJS v5 and v6 apps. (#35)
+- CodeGraph now detects **Vert.x Web** HTTP routes — including verb helpers (`router.get/post/...`), `route(HttpMethod, path)`, and nested routers via `mountSubRouter` / `.subRouter` — so endpoint queries cover Vert.x services.
 
 ### Fixes
 

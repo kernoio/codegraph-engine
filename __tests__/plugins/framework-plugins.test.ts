@@ -24,6 +24,7 @@ import { hapiResolver } from '../../src/plugins/hapi/resolver';
 import { expressResolver } from '../../src/resolution/frameworks/express';
 import { litestarResolver } from '../../src/plugins/litestar/resolver';
 import { adonisjsResolver } from '../../src/plugins/adonisjs/resolver';
+import { vertxWebResolver } from '../../src/plugins/vertx-web/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -106,6 +107,9 @@ import {
   ADONIS_POLLS_ROUTES,
   ADONIS_LEARN_ROUTES,
   ADONIS_SITE_ROUTES,
+  VERTX_SIMPLE_REST,
+  VERTX_ACCOUNT_SERVER,
+  VERTX_WIKI_MOUNT_SUBROUTER,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -131,6 +135,7 @@ describe('in-repo plugin registry', () => {
       'kerno-slim',
       'kerno-sanic',
       'kerno-tsoa',
+      'kerno-vertx-web',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
       'fastify',
@@ -152,6 +157,7 @@ describe('in-repo plugin registry', () => {
       'slim',
       'sanic',
       'tsoa',
+      'vertx-web',
     ]);
   });
 
@@ -1859,5 +1865,86 @@ describe('slim plugin (framework: Slim)', () => {
       getAllFiles: () => ['main.py'],
     };
     expect(litestarResolver.detect!(negative as any)).toBe(false);
+describe('vertx-web plugin (framework: Vert.x Web)', () => {
+  it('extracts vert-x3/vertx-examples SimpleREST verb routes + method refs', () => {
+    const result = vertxWebResolver.extract!(
+      'web-examples/src/main/java/io/vertx/example/web/rest/SimpleREST.java',
+      VERTX_SIMPLE_REST
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /products',
+      'GET /products/:productID',
+      'PUT /products/:productID',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'handleAddProduct',
+      'handleGetProduct',
+      'handleListProducts',
+    ]);
+  });
+
+  it('extracts piomin AccountServer routes; skips middleware-only handlers', () => {
+    const result = vertxWebResolver.extract!(
+      'account-vertx-service/src/main/java/pl/piomin/services/vertx/account/AccountServer.java',
+      VERTX_ACCOUNT_SERVER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /account/:id',
+      'GET /account',
+      'GET /account/:id',
+      'GET /account/customer/:customer',
+      'POST /account',
+    ]);
+  });
+
+  it('applies mountSubRouter prefix (vertx-guide-for-java-devs)', () => {
+    const result = vertxWebResolver.extract!(
+      'step-7/src/main/java/io/vertx/guides/wiki/http/HttpServerVerticle.java',
+      VERTX_WIKI_MOUNT_SUBROUTER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /api/pages/:id',
+      'GET /',
+      'GET /api/pages',
+      'GET /api/pages/:id',
+      'GET /api/token',
+      'GET /wiki/:page',
+      'POST /action/save',
+      'POST /api/pages',
+      'PUT /api/pages/:id',
+    ]);
+  });
+
+  it('detects vertx-web via pom.xml and rejects unrelated Java projects', () => {
+    const positive = {
+      readFile: (p: string) =>
+        p === 'pom.xml'
+          ? '<dependency><groupId>io.vertx</groupId><artifactId>vertx-web</artifactId></dependency>'
+          : null,
+      fileExists: () => false,
+      getAllFiles: () => ['pom.xml'],
+    };
+    expect(vertxWebResolver.detect(positive as any)).toBe(true);
+
+    const negative = {
+      readFile: (p: string) =>
+        p === 'pom.xml'
+          ? '<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>'
+          : null,
+      fileExists: () => false,
+      getAllFiles: () => ['pom.xml', 'src/Main.java'],
+    };
+    expect(vertxWebResolver.detect(negative as any)).toBe(false);
+  });
+
+  it('applies Vert.x 4 .route("/prefix/*").subRouter(sub) mount', () => {
+    const src = `
+Router main = Router.router(vertx);
+Router restAPI = Router.router(vertx);
+restAPI.get("/products/:id").handler(this::getProduct);
+main.route("/productsAPI/*").subRouter(restAPI);
+`;
+    const result = vertxWebResolver.extract!('SubRouter.java', src);
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /productsAPI/products/:id']);
   });
 });

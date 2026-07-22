@@ -876,6 +876,29 @@ public class GreetingResource {
     public String hello() {
         return "hello";
     }
+/** https://github.com/vert-x3/vertx-examples — web-examples/.../rest/SimpleREST.java */
+export const VERTX_SIMPLE_REST = `
+package io.vertx.example.web.rest;
+
+import io.vertx.core.AbstractVerticle;
+import io.vertx.ext.web.Router;
+import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.handler.BodyHandler;
+
+public class SimpleREST extends AbstractVerticle {
+  @Override
+  public void start() {
+    Router router = Router.router(vertx);
+    router.route().handler(BodyHandler.create());
+    router.get("/products/:productID").handler(this::handleGetProduct);
+    router.put("/products/:productID").handler(this::handleAddProduct);
+    router.get("/products").handler(this::handleListProducts);
+    vertx.createHttpServer().requestHandler(router).listen(8080);
+  }
+
+  private void handleGetProduct(RoutingContext routingContext) {}
+  private void handleAddProduct(RoutingContext routingContext) {}
+  private void handleListProducts(RoutingContext routingContext) {}
 }
 `;
 
@@ -2108,4 +2131,74 @@ const HomeController = () => import('#controllers/home_controller')
 router.get('/', [HomeController])
 router.on('/about').render('about')
 router.resource('blog', BlogController).params({ blog: 'slug' }).only(['index', 'show'])
+`;
+ * https://github.com/piomin/sample-vertx-microservices —
+ * account-vertx-service/.../AccountServer.java
+ */
+export const VERTX_ACCOUNT_SERVER = `
+package pl.piomin.services.vertx.account;
+
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.http.HttpMethod;
+import io.vertx.ext.web.Router;
+import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.ResponseContentTypeHandler;
+
+public class AccountServer extends AbstractVerticle {
+  @Override
+  public void start() throws Exception {
+    Router router = Router.router(vertx);
+    router.route("/account/*").handler(ResponseContentTypeHandler.create());
+    router.route(HttpMethod.POST, "/account").handler(BodyHandler.create());
+    router.get("/account/:id").produces("application/json").handler(rc -> {});
+    router.get("/account/customer/:customer").produces("application/json").handler(rc -> {});
+    router.get("/account").produces("application/json").handler(rc -> {});
+    router.post("/account").produces("application/json").handler(rc -> {});
+    router.delete("/account/:id").handler(rc -> {});
+  }
+}
+`;
+
+/**
+ * https://github.com/vert-x3/vertx-guide-for-java-devs —
+ * step-7/.../http/HttpServerVerticle.java (mountSubRouter)
+ */
+export const VERTX_WIKI_MOUNT_SUBROUTER = `
+package io.vertx.guides.wiki.http;
+
+import io.vertx.core.AbstractVerticle;
+import io.vertx.ext.web.Router;
+import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.JWTAuthHandler;
+
+public class HttpServerVerticle extends AbstractVerticle {
+  @Override
+  public void start() {
+    Router router = Router.router(vertx);
+    router.route().handler(BodyHandler.create());
+    router.get("/").handler(this::indexHandler);
+    router.get("/wiki/:page").handler(this::pageRenderingHandler);
+    router.post("/action/save").handler(this::pageUpdateHandler);
+
+    Router apiRouter = Router.router(vertx);
+    apiRouter.get("/token").handler(this::apiToken);
+    apiRouter.route("/*").handler(JWTAuthHandler.create(null));
+    apiRouter.get("/pages").handler(this::apiRoot);
+    apiRouter.get("/pages/:id").handler(this::apiGetPage);
+    apiRouter.post("/pages").handler(this::apiCreatePage);
+    apiRouter.put("/pages/:id").handler(this::apiUpdatePage);
+    apiRouter.delete("/pages/:id").handler(this::apiDeletePage);
+    router.mountSubRouter("/api", apiRouter);
+  }
+
+  private void indexHandler() {}
+  private void pageRenderingHandler() {}
+  private void pageUpdateHandler() {}
+  private void apiToken() {}
+  private void apiRoot() {}
+  private void apiGetPage() {}
+  private void apiCreatePage() {}
+  private void apiUpdatePage() {}
+  private void apiDeletePage() {}
+}
 `;

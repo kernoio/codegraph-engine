@@ -25,7 +25,8 @@
     "sanic-api",
     "hapi-users",
     "litestar-translator",
-    "adonisjs-learn"
+    "adonisjs-learn",
+    "vertx-simple-rest"
   ],
   "repos": [
     {
@@ -147,6 +148,14 @@
       "minRoutes": 10,
       "optional": true,
       "note": "AdonisJS v6 routes \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "vertx-examples",
+      "url": "https://github.com/vert-x3/vertx-examples.git",
+      "shallow": true,
+      "minRoutes": 3,
+      "optional": true,
+      "note": "Vert.x Web SimpleREST + siblings \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

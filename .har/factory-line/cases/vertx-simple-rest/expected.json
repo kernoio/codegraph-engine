@@ -1,0 +1,10 @@
+{
+  "framework": "vertx-web",
+  "source": "vert-x3/vertx-examples — web-examples/.../rest/SimpleREST.java",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /products",
+    "GET /products/:productID",
+    "PUT /products/:productID"
+  ]
+}
