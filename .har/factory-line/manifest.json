@@ -23,7 +23,8 @@
     "slim-skeleton-users",
     "aiohttp-polls",
     "sanic-api",
-    "hapi-users"
+    "hapi-users",
+    "litestar-translator"
   ],
   "repos": [
     {
@@ -129,6 +130,14 @@
       "minRoutes": 6,
       "optional": true,
       "note": "Hapi server.route arrays + plugin register \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "nllb-api",
+      "url": "https://github.com/winstxnhdw/nllb-api.git",
+      "shallow": true,
+      "minRoutes": 6,
+      "optional": true,
+      "note": "Litestar TranslatorController \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

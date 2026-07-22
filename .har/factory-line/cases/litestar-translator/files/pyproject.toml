@@ -1,0 +1,4 @@
+[project]
+name = "litestar-translator-mini"
+version = "0.0.0"
+dependencies = ["litestar>=2"]

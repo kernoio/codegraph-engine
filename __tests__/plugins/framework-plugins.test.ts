@@ -22,6 +22,7 @@ import { aiohttpResolver } from '../../src/plugins/aiohttp/resolver';
 import { sanicResolver } from '../../src/plugins/sanic/resolver';
 import { hapiResolver } from '../../src/plugins/hapi/resolver';
 import { expressResolver } from '../../src/resolution/frameworks/express';
+import { litestarResolver } from '../../src/plugins/litestar/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -97,6 +98,10 @@ import {
   HAPI_FRAME_LOGIN,
   HAPI_SPARKJOKE_ROUTES,
   HAPI_METHOD_ARRAY_AND_PREFIX,
+  NLLB_TRANSLATOR_CONTROLLER,
+  LITESTAR_FULLSTACK_USER_CONTROLLER,
+  LITESTAR_FULLSTACK_TEAM_CONTROLLER,
+  LITESTAR_ROUTE_AND_ROUTER,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -112,6 +117,7 @@ describe('in-repo plugin registry', () => {
       'kerno-micronaut',
       'kerno-koa',
       'kerno-hapi',
+      'kerno-litestar',
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
@@ -132,6 +138,7 @@ describe('in-repo plugin registry', () => {
       'hapi',
       'laravel',
       'micronaut',
+      'litestar',
       'nestjs',
       'next-app-router',
       'sinatra-grape',
@@ -1534,6 +1541,84 @@ describe('micronaut plugin (framework: Micronaut)', () => {
       },
       fileExists: () => false,
       getProjectRoot: () => '/mn',
+describe('litestar plugin (framework: Litestar)', () => {
+  it('extracts nllb-api TranslatorController (Controller.path + positional paths)', () => {
+    const result = litestarResolver.extract!(
+      'server/api/v4/translator.py',
+      NLLB_TRANSLATOR_CONTROLLER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /translator',
+      'GET /translator',
+      'GET /translator/stream',
+      'GET /translator/tokens',
+      'POST /translator',
+      'PUT /translator',
+    ]);
+    expect(result.references.map((r) => r.referenceName)).toContain('tokens');
+  });
+
+  it('extracts litestar-fullstack UserController (path= kwarg + typed params)', () => {
+    const result = litestarResolver.extract!(
+      'src/py/app/domain/accounts/controllers/_user.py',
+      LITESTAR_FULLSTACK_USER_CONTROLLER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /api/users/{user_id}',
+      'GET /api/users',
+      'GET /api/users/{user_id}',
+      'PATCH /api/users/{user_id}',
+      'POST /api/users',
+    ]);
+  });
+
+  it('extracts litestar-fullstack TeamController (absolute path= on handlers)', () => {
+    const result = litestarResolver.extract!(
+      'src/py/app/domain/teams/controllers/_team.py',
+      LITESTAR_FULLSTACK_TEAM_CONTROLLER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /api/teams/{team_id}',
+      'GET /api/teams',
+      'GET /api/teams/{team_id}',
+      'PATCH /api/teams/{team_id}',
+      'POST /api/teams',
+    ]);
+  });
+
+  it('extracts @route(http_method=…) and applies Router path in postExtract', () => {
+    const filePath = 'app/routes.py';
+    const extracted = litestarResolver.extract!(filePath, LITESTAR_ROUTE_AND_ROUTER);
+    expect(extracted.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /health',
+      'GET /{order_id}',
+      'HEAD /health',
+    ]);
+
+    const ctx = {
+      getNodesInFile: () => extracted.nodes,
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: (kind: string) => (kind === 'route' ? extracted.nodes : []),
+      iterateNodesByKind: (kind: string) =>
+        (kind === 'route' ? extracted.nodes : [])[Symbol.iterator](),
+      fileExists: () => true,
+      readFile: (fp: string) => (fp === filePath ? LITESTAR_ROUTE_AND_ROUTER : null),
+      getProjectRoot: () => '/test',
+      getAllFiles: () => [filePath],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    const updates = litestarResolver.postExtract!(ctx as any);
+    expect(updates.map((n) => n.name).sort()).toEqual(['GET /orders/{order_id}']);
+  });
+
+  it('detects litestar via pyproject.toml and rejects unrelated projects', () => {
+    const positive = {
+      readFile: (f: string) =>
+        f === 'pyproject.toml' ? '[project]\ndependencies = ["litestar>=2"]\n' : null,
+      fileExists: () => false,
+      getAllFiles: () => ['pyproject.toml'],
       getNodesByName: () => [],
       getNodesByQualifiedName: () => [],
       getNodesByKind: () => [],
@@ -1674,5 +1759,18 @@ describe('slim plugin (framework: Slim)', () => {
     const updates = hapiResolver.postExtract!(ctx as any);
     expect(updates).toHaveLength(1);
     expect(updates[0]!.name).toBe('GET /api/v1/users');
+      getProjectRoot: () => '/test',
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    expect(litestarResolver.detect!(positive as any)).toBe(true);
+
+    const negative = {
+      ...positive,
+      readFile: (f: string) =>
+        f === 'pyproject.toml' ? '[project]\ndependencies = ["fastapi"]\n' : null,
+      getAllFiles: () => ['main.py'],
+    };
+    expect(litestarResolver.detect!(negative as any)).toBe(false);
   });
 });

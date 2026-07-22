@@ -1,0 +1,13 @@
+{
+  "framework": "litestar",
+  "source": "winstxnhdw/nllb-api — server/api/v4/translator.py",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /translator",
+    "GET /translator",
+    "GET /translator/stream",
+    "GET /translator/tokens",
+    "POST /translator",
+    "PUT /translator"
+  ]
+}

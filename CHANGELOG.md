@@ -37,6 +37,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CodeGraph now detects **aiohttp** HTTP routes — including `router.add_*`, `web.get`/`web.post` route tables, `RouteTableDef` decorators, class-based `web.view` handlers, and `add_subapp` prefixes — so endpoint queries cover aiohttp services. (#34)
 - CodeGraph now detects **Sanic** HTTP routes — including `@app.route` / shorthand verb decorators, `add_route`, Blueprint `url_prefix` (and registration-time prefixes), and `HTTPMethodView` class-based views — so endpoint queries cover Sanic services. (#33)
 - CodeGraph now detects **Hapi** HTTP routes — including `server.route` object and array forms, method arrays, catch-all `*`, and `register` route prefixes — so endpoint queries cover Hapi services. Express no longer silently claims `@hapi/hapi` / `hapi` dependencies. (#28)
+- CodeGraph now detects **Litestar** HTTP routes — including `@get`/`@post`/… semantic decorators, `@route(http_method=…)`, `Controller.path` prefixes, typed path params, and `Router(path=…)` mounts — so endpoint queries cover Litestar services.
 
 ### Fixes
 
