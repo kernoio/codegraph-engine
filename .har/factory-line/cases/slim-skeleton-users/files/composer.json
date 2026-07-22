@@ -1,0 +1,7 @@
+{
+  "name": "codegraph/factory-slim-skeleton-users",
+  "require": {
+    "php": "^8.1",
+    "slim/slim": "^4.13"
+  }
+}

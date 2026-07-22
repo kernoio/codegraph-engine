@@ -1437,4 +1437,95 @@ apiRouter.use('/users', usersRouter.routes());
 
 function getUsers(ctx) { ctx.body = []; }
 function getUser(ctx) { ctx.body = { id: ctx.params.id }; }
+/** https://github.com/slimphp/Slim-Skeleton — app/routes.php */
+export const SLIM_SKELETON_ROUTES = `
+<?php
+declare(strict_types=1);
+
+use App\\Application\\Actions\\User\\ListUsersAction;
+use App\\Application\\Actions\\User\\ViewUserAction;
+use Psr\\Http\\Message\\ResponseInterface as Response;
+use Psr\\Http\\Message\\ServerRequestInterface as Request;
+use Slim\\App;
+use Slim\\Interfaces\\RouteCollectorProxyInterface as Group;
+
+return function (App $app) {
+    $app->options('/{routes:.*}', function (Request $request, Response $response) {
+        return $response;
+    });
+
+    $app->get('/', function (Request $request, Response $response) {
+        $response->getBody()->write('Hello world!');
+        return $response;
+    });
+
+    $app->group('/users', function (Group $group) {
+        $group->get('', ListUsersAction::class);
+        $group->get('/{id}', ViewUserAction::class);
+    });
+};
+`;
+
+/** https://github.com/maurobonfietti/rest-api-slim-php — src/App/Routes.php */
+export const SLIM_REST_API_ROUTES = `
+<?php
+declare(strict_types=1);
+
+use App\\Controller\\Note;
+use App\\Controller\\Task;
+use App\\Controller\\User;
+use App\\Middleware\\Auth;
+
+return static function ($app) {
+    $app->get('/', 'App\\Controller\\DefaultController:getHelp');
+    $app->get('/status', 'App\\Controller\\DefaultController:getStatus');
+    $app->post('/login', \\App\\Controller\\User\\Login::class);
+
+    $app->group('/api/v1', function () use ($app): void {
+        $app->group('/tasks', function () use ($app): void {
+            $app->get('', Task\\GetAll::class);
+            $app->post('', Task\\Create::class);
+            $app->get('/{id}', Task\\GetOne::class);
+            $app->put('/{id}', Task\\Update::class);
+            $app->delete('/{id}', Task\\Delete::class);
+        })->add(new Auth());
+
+        $app->group('/users', function () use ($app): void {
+            $app->get('', User\\GetAll::class)->add(new Auth());
+            $app->post('', User\\Create::class);
+            $app->get('/{id}', User\\GetOne::class)->add(new Auth());
+            $app->put('/{id}', User\\Update::class)->add(new Auth());
+            $app->delete('/{id}', User\\Delete::class)->add(new Auth());
+        });
+    });
+
+    return $app;
+};
+`;
+
+/** https://github.com/gothinkster/slim-php-realworld-example-app — src/routes.php (trimmed) */
+export const SLIM_REALWORLD_ROUTES = `
+<?php
+use Conduit\\Controllers\\Auth\\LoginController;
+use Conduit\\Controllers\\Auth\\RegisterController;
+use Conduit\\Controllers\\User\\UserController;
+use Slim\\Http\\Request;
+use Slim\\Http\\Response;
+
+$app->group('/api',
+    function () {
+        /** @var \\Slim\\App $this */
+        $this->post('/users', RegisterController::class . ':register')->setName('auth.register');
+        $this->post('/users/login', LoginController::class . ':login')->setName('auth.login');
+        $this->get('/user', UserController::class . ':show')->setName('user.show');
+        $this->put('/user', UserController::class . ':update')->setName('user.update');
+        $this->map(['GET', 'DELETE', 'PATCH', 'PUT'], '/books/{id:[0-9]+}', function ($request, $response, array $args) {
+            return $response;
+        });
+    });
+
+$app->get('/[{name}]',
+    function (Request $request, Response $response, array $args) {
+        return $this->renderer->render($response, 'index.phtml', $args);
+    });
 `;

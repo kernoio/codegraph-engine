@@ -19,7 +19,8 @@
     "fastify-user-routes",
     "jaxrs-quarkus-fruits",
     "micronaut-kestra-misc",
-    "koa-blog-users"
+    "koa-blog-users",
+    "slim-skeleton-users"
   ],
   "repos": [
     {
@@ -93,6 +94,14 @@
       "minRoutes": 4,
       "optional": true,
       "note": "Koa @koa/router blog example \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "slim-skeleton",
+      "url": "https://github.com/slimphp/Slim-Skeleton.git",
+      "shallow": true,
+      "minRoutes": 3,
+      "optional": true,
+      "note": "Slim 4 skeleton \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

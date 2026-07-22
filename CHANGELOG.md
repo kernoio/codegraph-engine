@@ -33,6 +33,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CodeGraph now detects **JAX-RS** HTTP routes — including class and method `@Path` composition and `@GET` / `@POST` / `@PUT` / `@DELETE` / `@PATCH` (and friends) — across Quarkus, Jersey, RESTEasy, and Dropwizard, so endpoint queries cover Jakarta REST services. (#25)
 - CodeGraph now detects **Micronaut** HTTP routes — including class-level `@Controller` prefixes, method `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete` (and friends) with positional, `uri=`, and `value=` paths, plus Kotlin controllers — so endpoint queries cover Micronaut services.
 - CodeGraph now detects **Koa** (`@koa/router` / `koa-router`) HTTP routes — including shorthand verbs, constructor and `.prefix()` prefixes, and nested `.use()` mounts — so endpoint queries cover Koa services.
+- CodeGraph now detects **Slim** HTTP routes — including `$app->get/post/…`, nested route groups with prefixes, `map()` multi-method registration, and class/`Class:method` handlers — so endpoint queries cover Slim PHP services.
 
 ### Fixes
 

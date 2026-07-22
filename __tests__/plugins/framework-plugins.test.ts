@@ -17,6 +17,7 @@ import { fastifyResolver } from '../../src/plugins/fastify/resolver';
 import { jaxrsResolver } from '../../src/plugins/jaxrs/resolver';
 import { micronautResolver } from '../../src/plugins/micronaut/resolver';
 import { koaResolver } from '../../src/plugins/koa/resolver';
+import { slimResolver } from '../../src/plugins/slim/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -75,6 +76,9 @@ import {
   KAILS_USERS_ROUTES,
   KAILS_ARTICLES_ROUTES,
   KOA_NESTED_MOUNT_EXAMPLE,
+  SLIM_SKELETON_ROUTES,
+  SLIM_REST_API_ROUTES,
+  SLIM_REALWORLD_ROUTES,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -93,6 +97,7 @@ describe('in-repo plugin registry', () => {
       'kerno-php-http-routes',
       'kerno-sinatra-grape',
       'kerno-symfony',
+      'kerno-slim',
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
@@ -108,6 +113,7 @@ describe('in-repo plugin registry', () => {
       'next-app-router',
       'sinatra-grape',
       'symfony',
+      'slim',
       'tsoa',
     ]);
   });
@@ -1230,5 +1236,92 @@ public class UsersController {
     const updates = koaResolver.postExtract!(ctx as any);
     expect(updates).toHaveLength(1);
     expect(updates[0]!.name).toBe('GET /api/users/sign_in');
+describe('slim plugin (framework: Slim)', () => {
+  it('extracts slimphp/Slim-Skeleton verb + group routes', () => {
+    const result = slimResolver.extract!('app/routes.php', SLIM_SKELETON_ROUTES);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /users',
+      'GET /users/{id}',
+      'OPTIONS /{routes}',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'ListUsersAction',
+      'ViewUserAction',
+    ]);
+  });
+
+  it('extracts maurobonfietti/rest-api-slim-php nested groups', () => {
+    const result = slimResolver.extract!('src/App/Routes.php', SLIM_REST_API_ROUTES);
+    const names = result.nodes.map((n) => n.name).sort();
+    expect(names).toEqual([
+      'DELETE /api/v1/tasks/{id}',
+      'DELETE /api/v1/users/{id}',
+      'GET /',
+      'GET /api/v1/tasks',
+      'GET /api/v1/tasks/{id}',
+      'GET /api/v1/users',
+      'GET /api/v1/users/{id}',
+      'GET /status',
+      'POST /api/v1/tasks',
+      'POST /api/v1/users',
+      'POST /login',
+      'PUT /api/v1/tasks/{id}',
+      'PUT /api/v1/users/{id}',
+    ]);
+    expect(result.references.map((r) => r.referenceName)).toContain('DefaultController@getHelp');
+    expect(result.references.map((r) => r.referenceName)).toContain('Login');
+    expect(result.references.map((r) => r.referenceName)).toContain('GetAll');
+  });
+
+  it('extracts realworld Class::class . :method, map(), and optional placeholders', () => {
+    const result = slimResolver.extract!('src/routes.php', SLIM_REALWORLD_ROUTES);
+    const names = result.nodes.map((n) => n.name).sort();
+    expect(names).toContain('POST /api/users');
+    expect(names).toContain('POST /api/users/login');
+    expect(names).toContain('GET /api/user');
+    expect(names).toContain('PUT /api/user');
+    expect(names).toContain('GET /api/books/{id}');
+    expect(names).toContain('DELETE /api/books/{id}');
+    expect(names).toContain('PATCH /api/books/{id}');
+    expect(names).toContain('PUT /api/books/{id}');
+    expect(names).toContain('GET /{name}');
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'LoginController@login',
+      'RegisterController@register',
+      'UserController@show',
+      'UserController@update',
+    ]);
+  });
+
+  it('detects slim/slim composer dependency and rejects unrelated PHP', () => {
+    const files = new Map<string, string>([
+      [
+        'composer.json',
+        JSON.stringify({ require: { 'slim/slim': '^4.0', php: '^8.1' } }),
+      ],
+      ['app/routes.php', SLIM_SKELETON_ROUTES],
+    ]);
+    const ctx = {
+      projectRoot: '/tmp/slim-app',
+      fileExists: (p: string) => files.has(p),
+      readFile: (p: string) => files.get(p) ?? null,
+      getAllFiles: () => [...files.keys()],
+      getNodesByName: () => [],
+      getNodesByKind: () => [],
+      getNodesInFile: () => [],
+    };
+    expect(slimResolver.detect!(ctx as never)).toBe(true);
+
+    const laravel = {
+      ...ctx,
+      readFile: (p: string) =>
+        p === 'composer.json'
+          ? JSON.stringify({ require: { 'laravel/framework': '^11.0' } })
+          : null,
+      getAllFiles: () => ['composer.json'],
+      fileExists: (p: string) => p === 'composer.json',
+    };
+    expect(slimResolver.detect!(laravel as never)).toBe(false);
   });
 });

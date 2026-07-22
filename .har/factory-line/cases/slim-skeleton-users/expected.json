@@ -1,0 +1,11 @@
+{
+  "framework": "slim",
+  "source": "slimphp/Slim-Skeleton — app/routes.php",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /",
+    "GET /users",
+    "GET /users/{id}",
+    "OPTIONS /{routes}"
+  ]
+}
