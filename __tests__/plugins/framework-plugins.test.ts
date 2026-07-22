@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { adonisjsResolver } from '../../src/plugins/adonisjs/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,12 +33,16 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  ADONIS_POLLS_ROUTES,
+  ADONIS_LEARN_ROUTES,
+  ADONIS_SITE_ROUTES,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
   it('exposes all Kerno built-in framework plugins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
+      'kerno-adonisjs',
       'kerno-go-http',
       'kerno-nestjs',
       'kerno-next-app-router',
@@ -45,6 +50,7 @@ describe('in-repo plugin registry', () => {
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
+      'adonisjs',
       'go',
       'laravel',
       'nestjs',
@@ -322,6 +328,90 @@ describe('nestjs plugin (framework: NestJS)', () => {
     const updates = nestjsKernoResolver.postExtract!(ctx as any);
     expect(updates).toHaveLength(1);
     expect(updates[0]!.name).toBe('GET /api/users');
+  });
+});
+
+describe('adonisjs plugin (framework: AdonisJS)', () => {
+  it('detects @adonisjs/core dependency and ignores express-only projects', () => {
+    const positive = {
+      readFile: (p: string) =>
+        p === 'package.json'
+          ? JSON.stringify({ dependencies: { '@adonisjs/core': '^6.0.0' } })
+          : null,
+      fileExists: () => false,
+      getAllFiles: () => ['package.json'],
+    };
+    const negative = {
+      readFile: (p: string) =>
+        p === 'package.json'
+          ? JSON.stringify({ dependencies: { express: '^4.0.0' } })
+          : null,
+      fileExists: () => false,
+      getAllFiles: () => ['package.json', 'src/app.js'],
+    };
+    expect(adonisjsResolver.detect(positive as any)).toBe(true);
+    expect(adonisjsResolver.detect(negative as any)).toBe(false);
+  });
+
+  it('extracts AdonisJS v5 Route.* polls-app routes', () => {
+    const result = adonisjsResolver.extract!('start/routes.ts', ADONIS_POLLS_ROUTES);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /polls/{id}',
+      'GET /',
+      'GET /login',
+      'GET /me',
+      'GET /polls/create',
+      'GET /polls/{slug}',
+      'GET /signup',
+      'POST /login',
+      'POST /logout',
+      'POST /me/avatar',
+      'POST /polls',
+      'POST /polls/{id}/vote',
+      'POST /signup',
+    ]);
+    expect(result.references.map((r) => r.referenceName)).toContain('PollsController.show');
+    expect(result.references.map((r) => r.referenceName)).toContain('SignupController.create');
+  });
+
+  it('extracts AdonisJS v6 groups, prefixes, and resource routes', () => {
+    const result = adonisjsResolver.extract!('start/routes.ts', ADONIS_LEARN_ROUTES);
+    const names = result.nodes.map((n) => n.name).sort();
+    expect(names).toContain('GET /');
+    expect(names).toContain('GET /movies');
+    expect(names).toContain('GET /movies/{slug}');
+    expect(names).toContain('GET /auth/register');
+    expect(names).toContain('POST /auth/login');
+    expect(names).toContain('POST /auth/logout');
+    expect(names).toContain('GET /admin');
+    expect(names).toContain('GET /admin/movies');
+    expect(names).toContain('POST /admin/movies');
+    expect(names).toContain('GET /admin/movies/{id}');
+    expect(names).toContain('PUT /admin/movies/{id}');
+    expect(names).toContain('PATCH /admin/movies/{id}');
+    expect(names).toContain('DELETE /admin/movies/{id}');
+    expect(result.references.map((r) => r.referenceName)).toContain('MoviesController.show');
+    expect(result.references.map((r) => r.referenceName)).toContain('AdminMoviesController.index');
+  });
+
+  it('extracts resource().only()/params() and router.on().render', () => {
+    const result = adonisjsResolver.extract!('start/routes.ts', ADONIS_SITE_ROUTES);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /about',
+      'GET /blog',
+      'GET /blog/{slug}',
+    ]);
+  });
+
+  it('does not claim plain Express router.get files', () => {
+    const express = `
+import express from 'express';
+const router = express.Router();
+router.get('/users', (req, res) => res.send('ok'));
+`;
+    const result = adonisjsResolver.extract!('routes/users.js', express);
+    expect(result.nodes).toEqual([]);
   });
 });
 

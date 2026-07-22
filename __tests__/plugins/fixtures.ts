@@ -262,3 +262,101 @@ Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers
 Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
 Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
+
+/**
+ * https://github.com/adonisjs-community/polls-app — start/routes.ts
+ * AdonisJS v5 `Route.*` facade with string controller handlers.
+ */
+export const ADONIS_POLLS_ROUTES = `
+import Route from '@ioc:Adonis/Core/Route'
+
+Route.where('id', Route.matchers.number())
+
+Route.get('signup', 'SignupController.create').middleware('guest')
+Route.post('signup', 'SignupController.store').middleware('guest')
+Route.get('login', 'LoginController.create').middleware('guest')
+Route.post('login', 'LoginController.store').middleware('guest')
+
+Route.post('logout', 'LoginController.destroy').middleware('auth')
+
+Route.get('/', 'PollsController.index')
+
+Route.get('/me', 'ProfileController.index').middleware('auth')
+Route.post('/me/avatar', 'ProfileController.updateAvatar').middleware('auth')
+
+Route.get('polls/create', 'PollsController.create').middleware('auth')
+Route.post('polls', 'PollsController.store').middleware('auth')
+Route.get('polls/:slug', 'PollsController.show')
+Route.post('polls/:id/vote', 'PollsController.submitVote').middleware('auth')
+Route.delete('polls/:id', 'PollsController.destroy').middleware('auth')
+`;
+
+/**
+ * https://github.com/adocasts/lets-learn-adonisjs-6 — start/routes.ts (trimmed)
+ * AdonisJS v6 router service: verb routes, prefixed groups, resource().
+ */
+export const ADONIS_LEARN_ROUTES = `
+import router from '@adonisjs/core/services/router'
+import { middleware } from './kernel.js'
+const AdminDashboardController = () => import('#controllers/admin/dashboard_controller')
+const AdminMoviesController = () => import('#controllers/admin/movies_controller')
+const HomeController = () => import('#controllers/home_controller')
+const MoviesController = () => import('#controllers/movies_controller')
+const RegisterController = () => import('#controllers/auth/register_controller')
+const LoginController = () => import('#controllers/auth/login_controller')
+const LogoutController = () => import('#controllers/auth/logout_controller')
+
+router.get('/', [HomeController, 'index']).as('home')
+
+router.get('/movies', [MoviesController, 'index']).as('movies.index')
+
+router
+  .get('/movies/:slug', [MoviesController, 'show'])
+  .as('movies.show')
+  .where('slug', router.matchers.slug())
+
+router
+  .group(() => {
+    router
+      .get('/register', [RegisterController, 'show'])
+      .as('register.show')
+      .use(middleware.guest())
+
+    router
+      .post('/register', [RegisterController, 'store'])
+      .as('register.store')
+      .use(middleware.guest())
+
+    router.get('/login', [LoginController, 'show']).as('login.show').use(middleware.guest())
+    router.post('/login', [LoginController, 'store']).as('login.store').use(middleware.guest())
+
+    router.post('/logout', [LogoutController, 'handle']).as('logout').use(middleware.auth())
+  })
+  .prefix('/auth')
+  .as('auth')
+
+router
+  .group(() => {
+    router.get('/', [AdminDashboardController, 'handle']).as('dashboard')
+
+    router.resource('movies', AdminMoviesController)
+  })
+  .prefix('/admin')
+  .as('admin')
+  .use(middleware.admin())
+`;
+
+/**
+ * https://github.com/adonisjs/adonisjs.com — start/routes.ts (trimmed)
+ * resource().params().only() + router.on().render shorthand.
+ */
+export const ADONIS_SITE_ROUTES = `
+import router from '@adonisjs/core/services/router'
+
+const BlogController = () => import('#controllers/blog_controller')
+const HomeController = () => import('#controllers/home_controller')
+
+router.get('/', [HomeController])
+router.on('/about').render('about')
+router.resource('blog', BlogController).params({ blog: 'slug' }).only(['index', 'show'])
+`;
