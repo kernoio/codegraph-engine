@@ -45,6 +45,9 @@ import aiohttpPlugin, { aiohttpResolver } from './aiohttp';
 import sanicPlugin, { sanicResolver } from './sanic';
 
 
+import hapiPlugin, { hapiResolver } from './hapi';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -62,6 +65,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   slimPlugin,
   aiohttpPlugin,
   sanicPlugin,
+  hapiPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -89,4 +93,5 @@ export {
   slimResolver,
   aiohttpResolver,
   sanicResolver,
+  hapiResolver,
 };

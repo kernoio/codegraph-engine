@@ -1733,4 +1733,184 @@ class ProtectedView(HTTPMethodView):
 
 app.add_route(PublicView.as_view(), "/")
 app.add_route(ProtectedView.as_view(), "/protected")
+/** https://github.com/jbuget/nodejs-clean-architecture-app — lib/interfaces/routes/users.js */
+export const HAPI_CLEAN_ARCH_USERS = `
+'use strict';
+
+const UsersController = require('../controllers/UsersController');
+
+module.exports = {
+  name: 'users',
+  version: '1.0.0',
+  register: async (server) => {
+
+    server.route([
+      {
+        method: 'GET',
+        path: '/users',
+        handler: UsersController.findUsers,
+        options: {
+          description: 'List all users',
+          tags: ['api'],
+        },
+      },
+      {
+        method: 'POST',
+        path: '/users',
+        handler: UsersController.createUser,
+        options: {
+          description: 'Create a user',
+          tags: ['api'],
+        },
+      },
+      {
+        method: 'GET',
+        path: '/users/{id}',
+        handler: UsersController.getUser,
+        options: {
+          description: 'Get a user by its {id}',
+          tags: ['api'],
+        },
+      },
+      {
+        method: 'DELETE',
+        path: '/users/{id}',
+        handler: UsersController.deleteUser,
+        options: {
+          description: 'Delete a user',
+          tags: ['api'],
+        },
+      },
+    ]);
+  }
+};
+`;
+
+/**
+ * https://github.com/jedireza/frame — server/api/login.js (trimmed to two routes)
+ * Plugin-style register(server) with options: { … } (handler at top level).
+ */
+export const HAPI_FRAME_LOGIN = `
+'use strict';
+
+const AuthAttempt = require('../models/auth-attempt');
+const Boom = require('@hapi/boom');
+const Joi = require('@hapi/joi');
+const Session = require('../models/session');
+const User = require('../models/user');
+
+const register = function (server, serverOptions) {
+
+    server.route({
+        method: 'POST',
+        path: '/api/login',
+        options: {
+            tags: ['api','login'],
+            description: 'Log in with username and password. [No Scope]',
+            auth: false,
+            validate: {
+                payload: {
+                    username: Joi.string().lowercase().required(),
+                    password: Joi.string().required()
+                }
+            }
+        },
+        handler: function (request, h) {
+            return { ok: true };
+        }
+    });
+
+    server.route({
+        method: 'POST',
+        path: '/api/login/forgot',
+        options: {
+            tags: ['api','login'],
+            auth: false
+        },
+        handler: async function (request, h) {
+            return { email: request.payload.email };
+        }
+    });
+};
+
+module.exports = {
+    name: 'api-login',
+    dependencies: [],
+    register
+};
+`;
+
+/**
+ * https://github.com/sparkbox/apprenticeship-sparkjoke — api/routes.js (trimmed)
+ * Top-level Hapi.server() + path params + named handler refs.
+ */
+export const HAPI_SPARKJOKE_ROUTES = `
+import Hapi from '@hapi/hapi';
+
+import getJokes from './jokes';
+import getUpperBound from '../src/Utilities/upperBound.js';
+
+const init = async () => {
+  const server = Hapi.server({
+    port: 8081,
+    host: 'localhost',
+  });
+
+  server.route({
+    method: 'GET',
+    path: '/welcome',
+    handler: () => 'Hello World!',
+  });
+
+  server.route({
+    method: 'GET',
+    path: '/jokes/{jokeIdx}',
+    options: {
+      cors: {
+        origin: ['*'],
+      },
+    },
+    handler: (request) => getJokes(request.params.jokeIdx),
+  });
+
+  server.route({
+    method: 'GET',
+    path: '/jokesUpperBound',
+    options: {
+      cors: {
+        origin: ['*'],
+      },
+    },
+    handler: () => getUpperBound(),
+  });
+
+  await server.start();
+};
+
+init();
+`;
+
+/**
+ * Synthetic: method arrays + '*' catch-all + register routes.prefix (same-file).
+ * Mirrors https://hapi.dev/api/#server.route() + server.register prefix option.
+ */
+export const HAPI_METHOD_ARRAY_AND_PREFIX = `
+const Hapi = require('@hapi/hapi');
+const server = Hapi.server({ port: 3000 });
+
+server.route({
+  method: ['PUT', 'POST'],
+  path: '/items',
+  handler: saveItem,
+});
+
+server.route({ method: '*', path: '/{p*}', handler: notFound });
+
+await server.register(function (server, options) {
+  server.route({
+    method: 'GET',
+    path: '/health',
+    handler: healthCheck,
+  });
+}, { routes: { prefix: '/api' } });
 `;

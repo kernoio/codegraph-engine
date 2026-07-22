@@ -22,7 +22,8 @@
     "koa-blog-users",
     "slim-skeleton-users",
     "aiohttp-polls",
-    "sanic-api"
+    "sanic-api",
+    "hapi-users"
   ],
   "repos": [
     {
@@ -120,6 +121,14 @@
       "minRoutes": 1,
       "optional": true,
       "note": "Sanic framework examples \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "hapi-clean-architecture",
+      "url": "https://github.com/jbuget/nodejs-clean-architecture-app.git",
+      "shallow": true,
+      "minRoutes": 6,
+      "optional": true,
+      "note": "Hapi server.route arrays + plugin register \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

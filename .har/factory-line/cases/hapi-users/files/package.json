@@ -1,0 +1,6 @@
+{
+  "name": "hapi-users-fixture",
+  "dependencies": {
+    "@hapi/hapi": "^21.0.0"
+  }
+}

@@ -58,9 +58,9 @@ export const expressResolver: FrameworkResolver = {
       try {
         const pkg = JSON.parse(packageJson);
         const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-        // Koa is owned by the kerno-koa plugin — do not claim it here
-        // (detected-but-silent / wrong prefixes are worse than not detecting).
-        if (deps.express || deps.fastify || deps.hapi) {
+        // Fastify / Hapi are owned by kerno-fastify / kerno-hapi plugins —
+        // do not claim them here (detected-but-silent is worse than not detecting).
+        if (deps.express || deps.koa) {
           return true;
         }
       } catch {
@@ -68,8 +68,7 @@ export const expressResolver: FrameworkResolver = {
       }
     }
 
-    // Check for common Express patterns (require an express import — bare
-    // `router.get` also appears in @koa/router / koa-router apps).
+    // Check for common Express patterns
     const allFiles = context.getAllFiles();
     for (const file of allFiles) {
       if (
@@ -78,12 +77,7 @@ export const expressResolver: FrameworkResolver = {
         file.includes('middleware')
       ) {
         const content = context.readFile(file);
-        if (
-          content &&
-          (/from\s+['"]express['"]/.test(content) ||
-            /require\s*\(\s*['"]express['"]\s*\)/.test(content) ||
-            /\bexpress\s*\(/.test(content))
-        ) {
+        if (content && (content.includes('express') || content.includes('app.get') || content.includes('router.get'))) {
           return true;
         }
       }

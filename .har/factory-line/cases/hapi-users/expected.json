@@ -1,0 +1,11 @@
+{
+  "framework": "hapi",
+  "source": "https://github.com/jbuget/nodejs-clean-architecture-app — lib/interfaces/routes/users.js",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /users/{id}",
+    "GET /users",
+    "GET /users/{id}",
+    "POST /users"
+  ]
+}
