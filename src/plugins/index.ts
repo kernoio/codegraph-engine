@@ -17,69 +17,47 @@ import honoPlugin, { honoResolver } from './hono';
 
 import ktorPlugin, { ktorResolver } from './ktor';
 
-
 import sinatraGrapePlugin, { sinatraGrapeResolver } from './sinatra-grape';
-
 
 import symfonyPlugin, { symfonyResolver } from './symfony';
 
-
 import fastifyPlugin, { fastifyResolver } from './fastify';
-
 
 import jaxrsPlugin, { jaxrsResolver } from './jaxrs';
 
-
 import micronautPlugin, { micronautResolver } from './micronaut';
-
 
 import koaPlugin, { koaResolver } from './koa';
 
-
 import slimPlugin, { slimResolver } from './slim';
-
 
 import aiohttpPlugin, { aiohttpResolver } from './aiohttp';
 
-
 import sanicPlugin, { sanicResolver } from './sanic';
-
 
 import hapiPlugin, { hapiResolver } from './hapi';
 
-
 import litestarPlugin, { litestarResolver } from './litestar';
-
 
 import adonisjsPlugin, { adonisjsResolver } from './adonisjs';
 
-
 import vertxWebPlugin, { vertxWebResolver } from './vertx-web';
-
 
 import remixPlugin, { remixResolver } from './remix';
 
-
 import fastEndpointsPlugin, { fastEndpointsResolver } from './fastendpoints';
-
 
 import elysiaPlugin, { elysiaResolver } from './elysia';
 
-
 import http4sPlugin, { http4sResolver } from './http4s';
-
 
 import tornadoPlugin, { tornadoResolver } from './tornado';
 
-
 import akkaHttpPlugin, { akkaHttpResolver } from './akka-http';
-
 
 import pyramidPlugin, { pyramidResolver } from './pyramid';
 
-
 import bottlePlugin, { bottleResolver } from './bottle';
-
 
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
