@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Endpoint detection factory line — mini-repo cases (full index) plus optional cloned OSS repos.",
+  "description": "Endpoint detection factory line \u2014 mini-repo cases (full index) plus optional cloned OSS repos.",
   "miniRepos": [
     "tsoa-ssh",
     "tsoa-get",
@@ -10,7 +10,8 @@
     "next-endpoint-scope",
     "django-users",
     "nestjs-novu-widgets",
-    "fiber-auth-jwt"
+    "fiber-auth-jwt",
+    "hono-blog"
   ],
   "repos": [
     {
@@ -19,7 +20,7 @@
       "shallow": true,
       "minRoutes": 1,
       "optional": true,
-      "note": "Stock Express resolver smoke — enable with FACTORY_LINE_CLONE=1"
+      "note": "Stock Express resolver smoke \u2014 enable with FACTORY_LINE_CLONE=1"
     },
     {
       "id": "gofiber-boilerplate",
@@ -27,7 +28,15 @@
       "shallow": true,
       "minRoutes": 2,
       "optional": true,
-      "note": "Fiber Group routes in app.go — enable with FACTORY_LINE_CLONE=1"
+      "note": "Fiber Group routes in app.go \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "hono-examples",
+      "url": "https://github.com/honojs/examples.git",
+      "shallow": true,
+      "minRoutes": 5,
+      "optional": true,
+      "note": "Hono official examples \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

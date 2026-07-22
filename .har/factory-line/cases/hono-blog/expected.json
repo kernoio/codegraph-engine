@@ -1,0 +1,14 @@
+{
+  "framework": "hono",
+  "source": "https://github.com/honojs/examples — blog/src/{index,api}.ts",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /api/posts/:id",
+    "GET /",
+    "GET /api",
+    "GET /api/posts",
+    "GET /api/posts/:id",
+    "POST /api/posts",
+    "PUT /api/posts/:id"
+  ]
+}

@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { honoResolver } from '../../src/plugins/hono/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,6 +33,10 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  HONO_EXAMPLES_BLOG_API,
+  HONO_EXAMPLES_BLOG_INDEX,
+  HONO_EXAMPLES_BASIC,
+  HONO_BASEPATH_CHAIN_ON,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -39,6 +44,7 @@ describe('in-repo plugin registry', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
       'kerno-go-http',
+      'kerno-hono',
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
@@ -46,6 +52,7 @@ describe('in-repo plugin registry', () => {
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
       'go',
+      'hono',
       'laravel',
       'nestjs',
       'next-app-router',
@@ -372,5 +379,104 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('hono plugin (framework: Hono)', () => {
+  it('detects hono dependency and ignores non-hono projects', () => {
+    const positive = {
+      readFile: (f: string) =>
+        f === 'package.json' ? JSON.stringify({ dependencies: { hono: '^4.0.0' } }) : null,
+      getAllFiles: () => [] as string[],
+    };
+    const negative = {
+      readFile: (f: string) =>
+        f === 'package.json' ? JSON.stringify({ dependencies: { express: '^4.0.0' } }) : null,
+      getAllFiles: () => [] as string[],
+    };
+    expect(honoResolver.detect(positive as never)).toBe(true);
+    expect(honoResolver.detect(negative as never)).toBe(false);
+  });
+
+  it('extracts honojs/examples blog api CRUD routes', () => {
+    const result = honoResolver.extract!('blog/src/api.ts', HONO_EXAMPLES_BLOG_API);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /posts/:id',
+      'GET /',
+      'GET /posts',
+      'GET /posts/:id',
+      'POST /posts',
+      'PUT /posts/:id',
+    ]);
+  });
+
+  it('extracts honojs/examples basic same-file sub-router mounts', () => {
+    const result = honoResolver.extract!('basic/src/index.ts', HONO_EXAMPLES_BASIC);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /api/posts',
+      'GET /book',
+      'GET /book/:id',
+      'GET /entry/:id',
+      'GET /hello',
+      'POST /api/posts',
+      'POST /book',
+    ]);
+  });
+
+  it('extracts basePath, chained verbs, app.on, and named handlers', () => {
+    const result = honoResolver.extract!('src/app.ts', HONO_BASEPATH_CHAIN_ON);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /endpoint',
+      'DELETE /post',
+      'GET /api/v1/users',
+      'GET /endpoint',
+      'POST /api/v1/users',
+      'POST /endpoint',
+      'PURGE /cache',
+      'PUT /post',
+    ]);
+    // app.on(['PUT','DELETE'], …) emits one reference per verb.
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'createUser',
+      'listUsers',
+      'mutatePost',
+      'mutatePost',
+      'purgeCache',
+    ]);
+  });
+
+  it('applies cross-file app.route mounts in postExtract', () => {
+    const extracted = honoResolver.extract!('src/api.ts', HONO_EXAMPLES_BLOG_API);
+    const ctx = {
+      getAllFiles: () => ['src/index.ts', 'src/api.ts'],
+      readFile: (f: string) =>
+        f === 'src/index.ts' ? HONO_EXAMPLES_BLOG_INDEX : f === 'src/api.ts' ? HONO_EXAMPLES_BLOG_API : null,
+      iterateNodesByKind: function* (kind: string) {
+        if (kind === 'route') yield* extracted.nodes;
+      },
+      getNodesByKind: (kind: string) => (kind === 'route' ? extracted.nodes : []),
+    };
+    const updates = honoResolver.postExtract!(ctx as never);
+    expect(updates.map((n) => n.name).sort()).toEqual([
+      'DELETE /api/posts/:id',
+      'GET /api',
+      'GET /api/posts',
+      'GET /api/posts/:id',
+      'POST /api/posts',
+      'PUT /api/posts/:id',
+    ]);
+  });
+
+  it('does not treat Map.get as a route', () => {
+    const src = `
+import { Hono } from 'hono'
+const app = new Hono()
+const map = new Map()
+map.get('/nope')
+app.get('/ok', (c) => c.text('ok'))
+`;
+    const result = honoResolver.extract!('src/app.ts', src);
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /ok']);
   });
 });
