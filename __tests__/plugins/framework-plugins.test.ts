@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { fastEndpointsResolver } from '../../src/plugins/fastendpoints/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,12 +33,21 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  SUNECKO_LOGIN_ENDPOINT,
+  SUNECKO_GET_PRODUCT_ENDPOINT,
+  KHALID_ROOT_ENDPOINT,
+  ELFOCRASH_GET_CUSTOMER_ENDPOINT,
+  DANIELMACKAY_MONKEY_GROUP,
+  DANIELMACKAY_GET_MONKEYS_ENDPOINT,
+  DANIELMACKAY_DELETE_MONKEY_ENDPOINT,
+  FASTENDPOINTS_VERBS_ROUTES,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
   it('exposes all Kerno built-in framework plugins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
+      'kerno-fastendpoints',
       'kerno-go-http',
       'kerno-nestjs',
       'kerno-next-app-router',
@@ -45,6 +55,7 @@ describe('in-repo plugin registry', () => {
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
+      'fastendpoints',
       'go',
       'laravel',
       'nestjs',
@@ -372,5 +383,127 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('fastendpoints plugin (framework: FastEndpoints)', () => {
+  it('extracts sunecko LoginEndpoint Configure() Post', () => {
+    const result = fastEndpointsResolver.extract!(
+      'src/Example.Api/Endpoints/Auth/LoginEndpoint.cs',
+      SUNECKO_LOGIN_ENDPOINT
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(['POST /auth/login']);
+    expect(result.references.map((r) => r.referenceName)).toEqual(['LoginEndpoint']);
+  });
+
+  it('extracts sunecko GetProductEndpoint Configure() Get', () => {
+    const result = fastEndpointsResolver.extract!(
+      'src/Example.Api/Endpoints/Product/GetProductEndpoint.cs',
+      SUNECKO_GET_PRODUCT_ENDPOINT
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /product']);
+  });
+
+  it('extracts khalidabuhakmeh Root EndpointWithoutRequest Get("/")', () => {
+    const result = fastEndpointsResolver.extract!(
+      'EndpointsSample/Api/Root.cs',
+      KHALID_ROOT_ENDPOINT
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /']);
+  });
+
+  it('extracts Elfocrash [HttpGet] attribute on Endpoint class (strips :guid)', () => {
+    const result = fastEndpointsResolver.extract!(
+      'Customers.Api/Endpoints/GetCustomerEndpoint.cs',
+      ELFOCRASH_GET_CUSTOMER_ENDPOINT
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /customers/{id}']);
+  });
+
+  it('extracts Verbs() + Routes() cartesian product', () => {
+    const result = fastEndpointsResolver.extract!(
+      'SaveUserEndpoint.cs',
+      FASTENDPOINTS_VERBS_ROUTES
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'PATCH /api/user/create',
+      'PATCH /api/user/save',
+      'POST /api/user/create',
+      'POST /api/user/save',
+      'PUT /api/user/create',
+      'PUT /api/user/save',
+    ]);
+  });
+
+  it('postExtract prepends Group<> prefix from sibling Group class', () => {
+    const getResult = fastEndpointsResolver.extract!(
+      'Features/Monkeys/Endpoints/GetMonkeysEndpoint.cs',
+      DANIELMACKAY_GET_MONKEYS_ENDPOINT
+    );
+    const delResult = fastEndpointsResolver.extract!(
+      'Features/Monkeys/Endpoints/DeleteMonkeyEndpoint.cs',
+      DANIELMACKAY_DELETE_MONKEY_ENDPOINT
+    );
+    const routes = [...getResult.nodes, ...delResult.nodes];
+    const files: Record<string, string> = {
+      'Features/Monkeys/Endpoints/MonkeyGroup.cs': DANIELMACKAY_MONKEY_GROUP,
+      'Features/Monkeys/Endpoints/GetMonkeysEndpoint.cs': DANIELMACKAY_GET_MONKEYS_ENDPOINT,
+      'Features/Monkeys/Endpoints/DeleteMonkeyEndpoint.cs': DANIELMACKAY_DELETE_MONKEY_ENDPOINT,
+    };
+    const ctx = {
+      getAllFiles: () => Object.keys(files),
+      readFile: (fp: string) => files[fp] ?? null,
+      getNodesInFile: (fp: string) => routes.filter((n) => n.filePath === fp),
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: (kind: string) => (kind === 'route' ? routes : []),
+      iterateNodesByKind: (kind: string) =>
+        (kind === 'route' ? routes : [])[Symbol.iterator](),
+      fileExists: (fp: string) => fp in files,
+      getProjectRoot: () => '/test',
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    const updates = fastEndpointsResolver.postExtract!(ctx as any);
+    const byId = new Map(routes.map((n) => [n.id, n.name]));
+    for (const u of updates) byId.set(u.id, u.name);
+    expect([...byId.values()].sort()).toEqual([
+      'DELETE /api/monkeys/{Id}',
+      'GET /api/monkeys',
+    ]);
+  });
+
+  it('detect() is positive for FastEndpoints PackageReference and negative otherwise', () => {
+    const positive = {
+      getAllFiles: () => ['App.csproj', 'Program.cs'],
+      readFile: (fp: string) => {
+        if (fp === 'App.csproj') {
+          return `<Project><ItemGroup><PackageReference Include="FastEndpoints" Version="5.0.0" /></ItemGroup></Project>`;
+        }
+        return 'var app = WebApplication.CreateBuilder();';
+      },
+      fileExists: () => false,
+      getProjectRoot: () => '/fe',
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: () => [],
+      iterateNodesByKind: () => [][Symbol.iterator](),
+      getNodesInFile: () => [],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    expect(fastEndpointsResolver.detect(positive as any)).toBe(true);
+
+    const negative = {
+      ...positive,
+      getAllFiles: () => ['App.csproj', 'Program.cs'],
+      readFile: (fp: string) => {
+        if (fp === 'App.csproj') {
+          return `<Project><ItemGroup><PackageReference Include="Swashbuckle.AspNetCore" /></ItemGroup></Project>`;
+        }
+        return 'app.MapControllers();';
+      },
+    };
+    expect(fastEndpointsResolver.detect(negative as any)).toBe(false);
   });
 });

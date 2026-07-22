@@ -262,3 +262,139 @@ Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers
 Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
 Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
+
+/** https://github.com/sunecko/dotnet-fastendpoint-example — src/Example.Api/Endpoints/Auth/LoginEndpoint.cs */
+export const SUNECKO_LOGIN_ENDPOINT = `
+using FastEndpoints;
+
+namespace Example.Api.Endpoints.Auth;
+
+public class LoginEndpoint: Endpoint<LoginCommand, TokenResponse>
+{
+    public override void Configure()
+    {
+        Post("/auth/login");
+        AllowAnonymous();
+        Summary(x => x.Summary = "Get auth token");
+    }
+
+    public override async Task HandleAsync(LoginCommand req, CancellationToken ct)
+    {
+        var response = await req.ExecuteAsync(ct);
+        await SendAsync(response, statusCode: StatusCodes.Status200OK);
+    }
+}
+`;
+
+/** https://github.com/sunecko/dotnet-fastendpoint-example — src/Example.Api/Endpoints/Product/GetProductEndpoint.cs */
+export const SUNECKO_GET_PRODUCT_ENDPOINT = `
+using FastEndpoints;
+
+namespace Example.Api.Endpoints.Product;
+
+public class GetProductEndpoint: Endpoint<GetProductQuery, IEnumerable<ProductDto>>
+{
+    public override void Configure()
+    {
+        Get("/product");
+        Summary(x => x.Summary = "Get product filtered");
+    }
+
+    public override async Task HandleAsync(GetProductQuery req, CancellationToken ct) { }
+}
+`;
+
+/** https://github.com/khalidabuhakmeh/FastEndpointsSample — EndpointsSample/Api/Root.cs */
+export const KHALID_ROOT_ENDPOINT = `
+using FastEndpoints;
+
+namespace EndpointsSample.Api;
+
+public class Root : EndpointWithoutRequest<string>
+{
+    public override void Configure()
+    {
+        Get("/");
+    }
+
+    public override async Task HandleAsync(CancellationToken ct) { }
+}
+`;
+
+/** https://github.com/Elfocrash/clean-minimal-api — Customers.Api/Endpoints/GetCustomerEndpoint.cs */
+export const ELFOCRASH_GET_CUSTOMER_ENDPOINT = `
+using FastEndpoints;
+using Microsoft.AspNetCore.Authorization;
+
+namespace Customers.Api.Endpoints;
+
+[HttpGet("customers/{id:guid}"), AllowAnonymous]
+public class GetCustomerEndpoint : Endpoint<GetCustomerRequest, CustomerResponse>
+{
+    public override async Task HandleAsync(GetCustomerRequest req, CancellationToken ct) { }
+}
+`;
+
+/** https://github.com/danielmackay/dotnet-fast-endpoints — FastWebApi/Features/Monkeys/Endpoints (trimmed) */
+export const DANIELMACKAY_MONKEY_GROUP = `
+using FastEndpoints.Swagger;
+
+namespace FastWebApi.Features.Monkeys.Endpoints;
+
+public class MonkeyGroup : Group
+{
+    public MonkeyGroup()
+    {
+        base.Configure("/api/monkeys", e =>
+        {
+            e.AllowAnonymous();
+        });
+    }
+}
+`;
+
+export const DANIELMACKAY_GET_MONKEYS_ENDPOINT = `
+namespace FastWebApi.Features.Monkeys.Endpoints;
+
+public class GetMonkeysEndpoint(MonkeyRepository repository) : EndpointWithoutRequest<GetMonkeysResponse>
+{
+    public override void Configure()
+    {
+        Get("");
+        Group<MonkeyGroup>();
+    }
+
+    public override async Task HandleAsync(CancellationToken ct) { }
+}
+`;
+
+export const DANIELMACKAY_DELETE_MONKEY_ENDPOINT = `
+namespace FastWebApi.Features.Monkeys.Endpoints;
+
+public class DeleteMonkeyEndpoint(MonkeyRepository repository) : Endpoint<DeleteMonkeyRequest>
+{
+    public override void Configure()
+    {
+        Delete("/{Id}");
+        Group<MonkeyGroup>();
+    }
+
+    public override async Task HandleAsync(DeleteMonkeyRequest req, CancellationToken ct) { }
+}
+`;
+
+/** Verbs() + Routes() multi-mapping — from FastEndpoints misc-conveniences docs */
+export const FASTENDPOINTS_VERBS_ROUTES = `
+using FastEndpoints;
+
+public class SaveUserEndpoint : Endpoint<UserRequest>
+{
+    public override void Configure()
+    {
+        Verbs(Http.POST, Http.PUT, Http.Patch);
+        Routes("/api/user/create", "/api/user/save");
+    }
+
+    public override async Task HandleAsync(UserRequest req, CancellationToken ct) { }
+}
+`;
