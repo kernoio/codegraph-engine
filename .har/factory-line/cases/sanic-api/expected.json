@@ -1,0 +1,10 @@
+{
+  "framework": "sanic",
+  "source": "howie6879/owllook — owllook/views/api_blueprint.py",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /api/owl_bd_novels/{name}",
+    "GET /api/owl_so_novels/{name}",
+    "POST /api/owl_novels_chapters"
+  ]
+}

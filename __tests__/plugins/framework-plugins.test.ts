@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { sanicResolver } from '../../src/plugins/sanic/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,6 +33,11 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  OWLLOOK_API_BLUEPRINT,
+  SANIC_OFFICIAL_BLUEPRINTS,
+  SANIC_HELLO_WORLD,
+  SANIC_JWT_ON_BLUEPRINT,
+  SANIC_JWT_CBV,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -42,6 +48,7 @@ describe('in-repo plugin registry', () => {
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
+      'kerno-sanic',
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
@@ -49,6 +56,7 @@ describe('in-repo plugin registry', () => {
       'laravel',
       'nestjs',
       'next-app-router',
+      'sanic',
       'tsoa',
     ]);
   });
@@ -322,6 +330,96 @@ describe('nestjs plugin (framework: NestJS)', () => {
     const updates = nestjsKernoResolver.postExtract!(ctx as any);
     expect(updates).toHaveLength(1);
     expect(updates[0]!.name).toBe('GET /api/users');
+  });
+});
+
+describe('sanic plugin (framework: Sanic)', () => {
+  it('extracts owllook Blueprint url_prefix + path params + methods', () => {
+    const result = sanicResolver.extract!(
+      'owllook/views/api_blueprint.py',
+      OWLLOOK_API_BLUEPRINT
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /api/owl_bd_novels/{name}',
+      'GET /api/owl_so_novels/{name}',
+      'POST /api/owl_novels_chapters',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'owl_bd_novels',
+      'owl_novels_chapters',
+      'owl_so_novels',
+    ]);
+  });
+
+  it('extracts sanic-org/sanic official blueprint example', () => {
+    const result = sanicResolver.extract!('examples/blueprints.py', SANIC_OFFICIAL_BLUEPRINTS);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /my_blueprint/foo',
+      'GET /my_blueprint2/foo',
+    ]);
+  });
+
+  it('extracts sanic hello_world @app.route', () => {
+    const result = sanicResolver.extract!('examples/hello_world.py', SANIC_HELLO_WORLD);
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /']);
+    expect(result.references.map((r) => r.referenceName)).toEqual(['test']);
+  });
+
+  it('extracts sanic-jwt shorthand @blueprint.get and CBV add_route', () => {
+    const bp = sanicResolver.extract!('example/on_blueprint.py', SANIC_JWT_ON_BLUEPRINT);
+    expect(bp.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /somewhere',
+      'GET /user/{id}',
+    ]);
+
+    const cbv = sanicResolver.extract!('example/cbv.py', SANIC_JWT_CBV);
+    expect(cbv.nodes.map((n) => n.name).sort()).toEqual(['GET /', 'GET /protected']);
+    expect(cbv.references.map((r) => r.referenceName).sort()).toEqual([
+      'ProtectedView',
+      'PublicView',
+    ]);
+  });
+
+  it('postExtract applies app.blueprint(..., url_prefix=)', () => {
+    const extracted = sanicResolver.extract!('example/on_blueprint.py', SANIC_JWT_ON_BLUEPRINT);
+    const ctx = {
+      getAllFiles: () => ['example/on_blueprint.py'],
+      readFile: () => SANIC_JWT_ON_BLUEPRINT,
+      getNodesInFile: () => extracted.nodes,
+      getNodesByName: () => [],
+      getImportMappings: () => [],
+    };
+    const updates = sanicResolver.postExtract!(ctx as any);
+    expect(updates.map((n) => n.name).sort()).toEqual([
+      'GET /test/somewhere',
+      'GET /test/user/{id}',
+    ]);
+  });
+
+  it('detects Sanic via requirements and rejects Flask-only projects', () => {
+    const positive = {
+      readFile: (f: string) => (f === 'requirements.txt' ? 'sanic==23.12.1\n' : null),
+      getAllFiles: () => ['requirements.txt', 'app.py'],
+      fileExists: () => false,
+      getNodesByName: () => [],
+      getNodesInFile: () => [],
+      getImportMappings: () => [],
+    };
+    expect(sanicResolver.detect(positive as any)).toBe(true);
+
+    const negative = {
+      readFile: (f: string) => {
+        if (f === 'requirements.txt') return 'flask==3.0.0\n';
+        if (f === 'app.py') return 'from flask import Flask\napp = Flask(__name__)\n';
+        return null;
+      },
+      getAllFiles: () => ['requirements.txt', 'app.py'],
+      fileExists: () => false,
+      getNodesByName: () => [],
+      getNodesInFile: () => [],
+      getImportMappings: () => [],
+    };
+    expect(sanicResolver.detect(negative as any)).toBe(false);
   });
 });
 
