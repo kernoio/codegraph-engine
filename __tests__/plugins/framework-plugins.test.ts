@@ -16,6 +16,7 @@ import { symfonyResolver } from '../../src/plugins/symfony/resolver';
 import { fastifyResolver } from '../../src/plugins/fastify/resolver';
 import { jaxrsResolver } from '../../src/plugins/jaxrs/resolver';
 import { micronautResolver } from '../../src/plugins/micronaut/resolver';
+import { koaResolver } from '../../src/plugins/koa/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -70,6 +71,10 @@ import {
   ASC_LAB_HELLO_CONTROLLER,
   ASC_LAB_OFFER_GATEWAY_CONTROLLER,
   MILL_MICRONAUT_HELLO_KT,
+  KOA_EXAMPLES_BLOG_APP,
+  KAILS_USERS_ROUTES,
+  KAILS_ARTICLES_ROUTES,
+  KOA_NESTED_MOUNT_EXAMPLE,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -82,6 +87,7 @@ describe('in-repo plugin registry', () => {
       'kerno-ktor',
       'kerno-jaxrs',
       'kerno-micronaut',
+      'kerno-koa',
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
@@ -95,6 +101,7 @@ describe('in-repo plugin registry', () => {
       'hono',
       'ktor',
       'jaxrs',
+      'koa',
       'laravel',
       'micronaut',
       'nestjs',
@@ -818,6 +825,17 @@ describe('fastify plugin (framework: Fastify)', () => {
       fileExists: () => false,
     } as any;
     expect(fastifyResolver.detect(positive)).toBe(true);
+describe('koa plugin (framework: Koa / @koa/router)', () => {
+  it('detects @koa/router dependency and ignores express-only projects', () => {
+    const positive = {
+      readFile: (fp: string) =>
+        fp === 'package.json'
+          ? JSON.stringify({ dependencies: { koa: '^2.0.0', '@koa/router': '^12.0.0' } })
+          : null,
+      getAllFiles: () => ['package.json'],
+      fileExists: () => false,
+    } as any;
+    expect(koaResolver.detect(positive)).toBe(true);
 
     const negative = {
       readFile: (fp: string) =>
@@ -888,6 +906,76 @@ describe('fastify plugin (framework: Fastify)', () => {
       language: 'typescript' as const,
       startLine: 10,
       endLine: 10,
+    expect(koaResolver.detect(negative)).toBe(false);
+  });
+
+  it('extracts koajs/examples blog chained routes with named handlers', () => {
+    const result = koaResolver.extract!('blog/app.js', KOA_EXAMPLES_BLOG_APP);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /post/:id',
+      'GET /post/new',
+      'POST /post',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'add',
+      'create',
+      'list',
+      'show',
+    ]);
+  });
+
+  it('applies constructor prefix (embbnux/kails users routes)', () => {
+    const result = koaResolver.extract!('app/routes/users.js', KAILS_USERS_ROUTES);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /users',
+      'GET /users/logout',
+      'GET /users/sign_in',
+      'POST /users/sign_in',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'users.LogIn',
+      'users.LogOut',
+      'users.index',
+      'users.signIn',
+    ]);
+  });
+
+  it('applies constructor prefix and last-handler refs (kails articles)', () => {
+    const result = koaResolver.extract!('app/routes/articles.js', KAILS_ARTICLES_ROUTES);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /articles/:id',
+      'GET /articles/:id/edit',
+      'GET /articles/new',
+      'POST /articles',
+      'PUT /articles/:id',
+    ]);
+    expect(result.references.map((r) => r.referenceName)).toContain('articles.show');
+    expect(result.references.map((r) => r.referenceName)).toContain('articles.create');
+  });
+
+  it('applies same-file nested .use() mount prefixes', () => {
+    const result = koaResolver.extract!('routes.js', KOA_NESTED_MOUNT_EXAMPLE);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /api/users',
+      'GET /api/users/:id',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'getUser',
+      'getUsers',
+    ]);
+  });
+
+  it('postExtract prepends cross-file .use() mount prefixes', () => {
+    const signInRoute = {
+      id: 'route:app/routes/users.js:8:GET:/users/sign_in',
+      kind: 'route' as const,
+      name: 'GET /users/sign_in',
+      qualifiedName: 'app/routes/users.js::route:GET:/users/sign_in',
+      filePath: 'app/routes/users.js',
+      language: 'javascript' as const,
+      startLine: 8,
+      endLine: 8,
       startColumn: 0,
       endColumn: 0,
       updatedAt: 0,
@@ -907,6 +995,20 @@ import fastify from 'fastify';
 import userRouter from './routes/user.router';
 const server = fastify();
 server.register(userRouter, { prefix: '/api/user' });
+      getNodesInFile: () => [signInRoute],
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: (kind: string) => (kind === 'route' ? [signInRoute] : []),
+      iterateNodesByKind: (kind: string) =>
+        kind === 'route' ? [signInRoute][Symbol.iterator]() : [][Symbol.iterator](),
+      fileExists: () => true,
+      readFile: (fp: string) => {
+        if (fp === 'app/index.js') {
+          return `
+import Router from '@koa/router';
+import users from './routes/users';
+const api = new Router({ prefix: '/api' });
+api.use(users.routes());
 `;
         }
         return null;
@@ -1121,5 +1223,12 @@ public class UsersController {
 `;
     const result = micronautResolver.extract!('UsersController.java', spring);
     expect(result.nodes).toEqual([]);
+      getAllFiles: () => ['app/index.js', 'app/routes/users.js'],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    const updates = koaResolver.postExtract!(ctx as any);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.name).toBe('GET /api/users/sign_in');
   });
 });

@@ -18,7 +18,8 @@
     "symfony-blog",
     "fastify-user-routes",
     "jaxrs-quarkus-fruits",
-    "micronaut-kestra-misc"
+    "micronaut-kestra-misc",
+    "koa-blog-users"
   ],
   "repos": [
     {
@@ -84,6 +85,14 @@
       "minRoutes": 2,
       "optional": true,
       "note": "Micronaut controllers \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "koa-examples",
+      "url": "https://github.com/koajs/examples.git",
+      "shallow": true,
+      "minRoutes": 4,
+      "optional": true,
+      "note": "Koa @koa/router blog example \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

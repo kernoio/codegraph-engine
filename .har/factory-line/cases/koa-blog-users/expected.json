@@ -1,0 +1,15 @@
+{
+  "framework": "koa",
+  "source": "https://github.com/koajs/examples blog/app.js + https://github.com/embbnux/kails app/routes/users.js",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /",
+    "GET /post/:id",
+    "GET /post/new",
+    "GET /users",
+    "GET /users/logout",
+    "GET /users/sign_in",
+    "POST /post",
+    "POST /users/sign_in"
+  ]
+}

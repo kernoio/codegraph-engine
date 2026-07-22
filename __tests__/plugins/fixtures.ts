@@ -1340,4 +1340,101 @@ class HelloController {
     @Produces(MediaType.TEXT_PLAIN)
     fun index(): String = "Hello World"
 }
+/** https://github.com/koajs/examples — blog/app.js (chained @koa/router verbs) */
+export const KOA_EXAMPLES_BLOG_APP = `
+const render = require('./lib/render');
+const logger = require('koa-logger');
+const router = require('@koa/router')();
+const koaBody = require('koa-body');
+
+const Koa = require('koa');
+const app = module.exports = new Koa();
+
+const posts = [];
+
+app.use(logger());
+app.use(render);
+app.use(koaBody());
+
+router
+  .get('/', list)
+  .get('/post/new', add)
+  .get('/post/:id', show)
+  .post('/post', create);
+
+app.use(router.routes());
+
+async function list(ctx) {
+  await ctx.render('list', { posts: posts });
+}
+
+async function add(ctx) {
+  await ctx.render('new');
+}
+
+async function show(ctx) {
+  const id = ctx.params.id;
+  const post = posts[id];
+  if (!post) ctx.throw(404, 'invalid post id');
+  await ctx.render('show', { post: post });
+}
+
+async function create(ctx) {
+  const post = ctx.request.body;
+  const id = posts.push(post) - 1;
+  post.created_at = new Date();
+  post.id = id;
+  ctx.redirect('/');
+}
+`;
+
+/** https://github.com/embbnux/kails — app/routes/users.js (constructor prefix) */
+export const KAILS_USERS_ROUTES = `
+import Router from '@koa/router';
+import users from '../controllers/users';
+
+const router = Router({
+  prefix: '/users'
+});
+router.get('/sign_in', users.signIn);
+router.post('/sign_in', users.LogIn);
+router.get('/logout', users.LogOut);
+router.get('/', users.index);
+
+module.exports = router;
+`;
+
+/** https://github.com/embbnux/kails — app/routes/articles.js (prefix + middleware chain) */
+export const KAILS_ARTICLES_ROUTES = `
+import Router from '@koa/router';
+import articles from '../controllers/articles';
+
+const router = Router({
+  prefix: '/articles'
+});
+router.get('/new', articles.checkLogin, articles.newArticle);
+router.get('/:id', articles.show);
+router.put('/:id', articles.checkLogin, articles.checkArticleOwner, articles.checkParamsBody, articles.update);
+router.get('/:id/edit', articles.checkLogin, articles.checkArticleOwner, articles.edit);
+router.post('/', articles.checkLogin, articles.checkParamsBody, articles.create);
+
+module.exports = router;
+`;
+
+/**
+ * Nested mount + constructor prefix (pattern from @koa/router README +
+ * https://github.com/javieraviles/node-typescript-koa-rest unprotected/protected split).
+ */
+export const KOA_NESTED_MOUNT_EXAMPLE = `
+import Router from '@koa/router';
+
+const usersRouter = new Router();
+usersRouter.get('/', getUsers);
+usersRouter.get('/:id', getUser);
+
+const apiRouter = new Router({ prefix: '/api' });
+apiRouter.use('/users', usersRouter.routes());
+
+function getUsers(ctx) { ctx.body = []; }
+function getUser(ctx) { ctx.body = { id: ctx.params.id }; }
 `;
