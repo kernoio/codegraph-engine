@@ -1184,5 +1184,160 @@ public class FruitResource {
     public Set<Fruit> delete(Fruit fruit) {
         return null;
     }
+/** https://github.com/kestra-io/kestra — webserver/.../controllers/api/HelloController-shaped MiscController (trimmed) */
+export const KESTRA_MISC_CONTROLLER = `
+package io.kestra.webserver.controllers.api;
+
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
+
+@Controller("/api/v1")
+public class MiscController {
+    @Get("/configs")
+    public Configuration getConfiguration() {
+        return null;
+    }
+
+    @Get("/configs/login")
+    public LoginConfiguration getLoginConfiguration() {
+        return null;
+    }
+
+    @Get("/{tenant}/usages/all")
+    public ApiUsage getUsages() {
+        return null;
+    }
+
+    @Post(uri = "/{tenant}/basicAuth")
+    public Object createBasicAuth() {
+        return null;
+    }
+
+    @Post("/login")
+    public Object login() {
+        return null;
+    }
+}
+`;
+
+/** https://github.com/kestra-io/kestra — webserver/.../controllers/api/ClusterController.java (trimmed) */
+export const KESTRA_CLUSTER_CONTROLLER = `
+package io.kestra.webserver.controllers.api;
+
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.PathVariable;
+
+@Controller("/api/v1/{tenant}/cluster")
+public class ClusterController {
+    @Get("services/{id}")
+    public HttpResponse<?> getService(@PathVariable("id") String id) {
+        return HttpResponse.ok();
+    }
+
+    @Get("/metrics/{serviceType}")
+    public Object metrics() {
+        return null;
+    }
+}
+`;
+
+/** https://github.com/kestra-io/kestra — webserver/.../controllers/api/KVController.java (trimmed) */
+export const KESTRA_KV_CONTROLLER = `
+package io.kestra.webserver.controllers.api;
+
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Put;
+
+@Controller("/api/v1/{tenant}")
+public class KVController {
+    @Get("/kv")
+    public Object listAllKeys() {
+        return null;
+    }
+
+    @Get(uri = "/namespaces/{namespace}/kv/{key}")
+    public Object getKeyValue() {
+        return null;
+    }
+
+    @Put(uri = "/namespaces/{namespace}/kv/{key}", consumes = { "text/plain" })
+    public void setKeyValue() {}
+
+    @Delete(uri = "/namespaces/{namespace}/kv/{key}")
+    public boolean deleteKeyValue() {
+        return true;
+    }
+
+    @Delete("/namespaces/{namespace}/kv")
+    public Object deleteKeyValues() {
+        return null;
+    }
+}
+`;
+
+/** https://github.com/asc-lab/micronaut-microservices-poc — policy-service/.../HelloController.java */
+export const ASC_LAB_HELLO_CONTROLLER = `
+package pl.altkom.asc.lab.micronaut.poc.policy.infrastructure.adapters.web;
+
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import pl.altkom.asc.lab.micronaut.poc.policy.service.api.v1.Health;
+
+@Controller("/hello")
+public class HelloController {
+
+    @Get
+    public HttpStatus index() {
+        return HttpStatus.OK;
+    }
+
+    @Get("/version")
+    public Health version() {
+        return new Health("1.0", "OK");
+    }
+}
+`;
+
+/** https://github.com/asc-lab/micronaut-microservices-poc — agent-portal-gateway/.../OfferGatewayController.java */
+export const ASC_LAB_OFFER_GATEWAY_CONTROLLER = `
+package pl.altkom.asc.lab.micronaut.poc.gateway;
+
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Post;
+import javax.inject.Inject;
+
+@Controller("/api/offers")
+public class OfferGatewayController {
+
+    @Inject
+    private Object client;
+
+    @Post(value = "/", consumes = "application/json")
+    CreateOfferResult create(CreateOfferCommand cmd) {
+        return null;
+    }
+}
+`;
+
+/** https://github.com/com-lihaoyi/mill — example/kotlinlib/web/9-hello-micronaut/micronaut/src/HelloController.kt */
+export const MILL_MICRONAUT_HELLO_KT = `
+package example.micronaut
+
+import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Produces
+
+@Controller("/hello")
+class HelloController {
+    @Get
+    @Produces(MediaType.TEXT_PLAIN)
+    fun index(): String = "Hello World"
 }
 `;

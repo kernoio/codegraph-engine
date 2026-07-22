@@ -30,6 +30,9 @@ import fastifyPlugin, { fastifyResolver } from './fastify';
 import jaxrsPlugin, { jaxrsResolver } from './jaxrs';
 
 
+import micronautPlugin, { micronautResolver } from './micronaut';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -42,6 +45,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   symfonyPlugin,
   fastifyPlugin,
   jaxrsPlugin,
+  micronautPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -64,4 +68,5 @@ export {
   symfonyResolver,
   fastifyResolver,
   jaxrsResolver,
+  micronautResolver,
 };

@@ -17,7 +17,8 @@
     "grape-statuses",
     "symfony-blog",
     "fastify-user-routes",
-    "jaxrs-quarkus-fruits"
+    "jaxrs-quarkus-fruits",
+    "micronaut-kestra-misc"
   ],
   "repos": [
     {
@@ -75,6 +76,14 @@
       "minRoutes": 4,
       "optional": true,
       "note": "Fastify shorthand + register prefix \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "asc-lab-micronaut-poc",
+      "url": "https://github.com/asc-lab/micronaut-microservices-poc.git",
+      "shallow": true,
+      "minRoutes": 2,
+      "optional": true,
+      "note": "Micronaut controllers \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }
