@@ -18,6 +18,9 @@ import honoPlugin, { honoResolver } from './hono';
 import ktorPlugin, { ktorResolver } from './ktor';
 
 
+import sinatraGrapePlugin, { sinatraGrapeResolver } from './sinatra-grape';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -26,6 +29,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   phpHttpRoutesPlugin,
   honoPlugin,
   ktorPlugin,
+  sinatraGrapePlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -44,4 +48,5 @@ export {
   phpHttpRoutesResolver,
   honoResolver,
   ktorResolver,
+  sinatraGrapeResolver,
 };

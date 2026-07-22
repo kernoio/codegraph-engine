@@ -27,6 +27,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Indexing large C and C++ codebases spends much less time in the function-pointer dispatch analysis (the pass that connects handler tables like a command table or an ops struct to their call sites): each source file is now read and prepared once instead of four times, files that can't contribute any dispatch wiring are skipped outright in the later linking steps, and on platforms with the native engine the per-file scanning itself now runs natively too. On a Linux-kernel-scale tree the pass runs about a third faster end-to-end, with graphs byte-for-byte identical; platforms without a native binary keep the same results on the previous path.
 - CodeGraph now detects **Hono** HTTP routes — including `app.get/post/…`, chained verbs, `app.on`, `basePath`, and `app.route()` sub-app mounts across files — so endpoint queries cover Hono services on Bun, Cloudflare Workers, and Node.
 - CodeGraph now detects **Ktor** HTTP routes — including nested `route` prefixes, verb helpers (`get`/`post`/`put`/`patch`/`delete`/…), and path segments without a leading slash — so endpoint queries cover Ktor services. (#24)
+- CodeGraph now detects **Sinatra** and **Grape** HTTP routes — including Sinatra namespaces, Grape `resource`/`route_param`/`prefix`, path versioning, and mounted API prefixes — so endpoint queries cover common Ruby API apps. (#26)
 
 ### Fixes
 

@@ -1,0 +1,10 @@
+{
+  "framework": "sinatra",
+  "source": "stevekinney/pizza — api/v1/pizzerias.rb",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /api/v1/pizzerias",
+    "GET /api/v1/pizzerias/{id}",
+    "GET /api/v1/properties/search"
+  ]
+}

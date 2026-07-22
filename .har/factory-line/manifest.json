@@ -12,7 +12,9 @@
     "nestjs-novu-widgets",
     "fiber-auth-jwt",
     "hono-blog",
-    "ktor-widgets"
+    "ktor-widgets",
+    "sinatra-pizzerias",
+    "grape-statuses"
   ],
   "repos": [
     {
@@ -46,6 +48,14 @@
       "minRoutes": 5,
       "optional": true,
       "note": "Ktor routing DSL \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "grape-on-rack",
+      "url": "https://github.com/ruby-grape/grape-on-rack.git",
+      "shallow": true,
+      "minRoutes": 5,
+      "optional": true,
+      "note": "Grape mount/prefix smoke \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }
