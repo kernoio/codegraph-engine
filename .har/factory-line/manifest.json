@@ -30,7 +30,8 @@
     "remix-healthz",
     "fastendpoints-auth",
     "elysia-notes",
-    "http4s-todo"
+    "http4s-todo",
+    "tornado-string-service"
   ],
   "repos": [
     {
@@ -192,6 +193,14 @@
       "minRoutes": 5,
       "optional": true,
       "note": "http4s DSL TodoService \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "webssh",
+      "url": "https://github.com/huashengdun/webssh.git",
+      "shallow": true,
+      "minRoutes": 2,
+      "optional": true,
+      "note": "Tornado Application handlers \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

@@ -29,6 +29,7 @@ import { remixResolver } from '../../src/plugins/remix/resolver';
 import { fastEndpointsResolver } from '../../src/plugins/fastendpoints/resolver';
 import { elysiaResolver } from '../../src/plugins/elysia/resolver';
 import { http4sResolver, parseHttp4sPath } from '../../src/plugins/http4s/resolver';
+import { tornadoResolver } from '../../src/plugins/tornado/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -139,6 +140,10 @@ import {
   HTTP4S_TODO_SERVICE,
   HTTP4S_METARANK_ROUTES,
   HTTP4S_PETSTORE_AUTH_ENDPOINTS,
+  TORNADO_STRING_SERVICE,
+  TORNADO_WEBSSH_MAIN,
+  TORNADO_YOUNG_USER_URLMAP,
+  TORNADO_URL_HELPER,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -167,6 +172,7 @@ describe('in-repo plugin registry', () => {
       'kerno-slim',
       'kerno-sanic',
       'kerno-remix',
+      'kerno-tornado',
       'kerno-tsoa',
       'kerno-vertx-web',
     ]);
@@ -193,6 +199,7 @@ describe('in-repo plugin registry', () => {
       'slim',
       'sanic',
       'remix',
+      'tornado',
       'tsoa',
       'vertx-web',
     ]);
@@ -1226,6 +1233,28 @@ describe('koa plugin (framework: Koa / @koa/router)', () => {
       'GET /',
       'GET /:id',
       'PATCH /:id',
+describe('tornado plugin (framework: Tornado)', () => {
+  it('extracts Introduction-to-Tornado string_service Application handlers', () => {
+    const result = tornadoResolver.extract!(
+      'simple_web_services/string_service.py',
+      TORNADO_STRING_SERVICE
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /reverse/{param}',
+      'POST /wrap',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'ReverseHandler',
+      'WrapHandler',
+    ]);
+  });
+
+  it('extracts webssh handlers with same-file verb inference', () => {
+    const result = tornadoResolver.extract!('webssh/main.py', TORNADO_WEBSSH_MAIN);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /ws',
+      'HEAD /',
       'POST /',
     ]);
   });
@@ -1356,6 +1385,30 @@ describe('hapi plugin (framework: Hapi)', () => {
       getAllFiles: () => ['package.json'],
       fileExists: () => true,
       getProjectRoot: () => '/test',
+  it('extracts Young urlmap tuples without a tornado import', () => {
+    const result = tornadoResolver.extract!('app/user/urlmap.py', TORNADO_YOUNG_USER_URLMAP);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /avatar/{param}',
+      'GET /login',
+      'GET /logout',
+      'GET /register',
+      'GET /register/template',
+    ]);
+  });
+
+  it('extracts tornado.web.url / URLSpec helper form', () => {
+    const result = tornadoResolver.extract!('app.py', TORNADO_URL_HELPER);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /story/{param}',
+    ]);
+  });
+
+  it('detects Tornado via requirements.txt and rejects unrelated projects', () => {
+    const positive = {
+      readFile: (f: string) => (f === 'requirements.txt' ? 'tornado==6.4\n' : null),
+      fileExists: () => false,
+      getAllFiles: () => ['requirements.txt'],
       getNodesByName: () => [],
       getNodesByQualifiedName: () => [],
       getNodesByKind: () => [],
@@ -2397,5 +2450,17 @@ val routes = HttpRoutes.of[IO] {
       'GET /search',
       'POST /search',
     ]);
+      getProjectRoot: () => '/proj',
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    expect(tornadoResolver.detect!(positive as any)).toBe(true);
+
+    const negative = {
+      ...positive,
+      readFile: (f: string) => (f === 'requirements.txt' ? 'flask==3.0\n' : null),
+      getAllFiles: () => ['requirements.txt', 'app.py'],
+    };
+    expect(tornadoResolver.detect!(negative as any)).toBe(false);
   });
 });

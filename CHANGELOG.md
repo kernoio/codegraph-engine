@@ -44,6 +44,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CodeGraph now detects **FastEndpoints** HTTP routes — including `Configure()` shorthand verbs, `Verbs()`/`Routes()` multi-mapping, class-level `[HttpGet]`/`[HttpPost]` attributes, and `Group<>` route prefixes — so endpoint queries cover FastEndpoints services.
 - CodeGraph now detects **Elysia** HTTP routes — including chained `.get()`/`.post()` methods, `.group()` prefixes (with optional guards), instance `prefix` options, and `.route()` custom verbs — so endpoint queries cover Bun-native Elysia services.
 - CodeGraph now detects **http4s** HTTP routes — including `HttpRoutes.of` / `AuthedRoutes.of` DSL matchers, method concatenation, typed path variables, and `asAuthed` auth endpoints — so endpoint queries cover Scala http4s services.
+- CodeGraph now detects **Tornado** HTTP routes from `Application` URLSpec tables — tuple handlers, `url()` / `URLSpec()`, regex path params, and same-file RequestHandler verb methods — so endpoint queries cover Tornado services.
 
 ### Fixes
 

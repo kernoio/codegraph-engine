@@ -69,6 +69,9 @@ import elysiaPlugin, { elysiaResolver } from './elysia';
 import http4sPlugin, { http4sResolver } from './http4s';
 
 
+import tornadoPlugin, { tornadoResolver } from './tornado';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -94,6 +97,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   fastEndpointsPlugin,
   elysiaPlugin,
   http4sPlugin,
+  tornadoPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -129,4 +133,5 @@ export {
   fastEndpointsResolver,
   elysiaResolver,
   http4sResolver,
+  tornadoResolver,
 };
