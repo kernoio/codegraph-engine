@@ -262,3 +262,145 @@ Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers
 Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
 Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
+
+/** https://github.com/honojs/examples — blog/src/api.ts */
+export const HONO_EXAMPLES_BLOG_API = `
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
+import { Bindings } from './bindings'
+import * as model from './model'
+
+const api = new Hono<{ Bindings: Bindings }>()
+api.use('/posts/*', cors())
+
+api.get('/', (c) => {
+  return c.json({ message: 'Hello' })
+})
+
+api.get('/posts', async (c) => {
+  const posts = await model.getPosts(c.env.BLOG_EXAMPLE)
+  return c.json({ posts: posts, ok: true })
+})
+
+api.post('/posts', async (c) => {
+  const param = await c.req.json()
+  const newPost = await model.createPost(c.env.BLOG_EXAMPLE, param as model.Param)
+  if (!newPost) {
+    return c.json({ error: 'Can not create new post', ok: false }, 422)
+  }
+  return c.json({ post: newPost, ok: true }, 201)
+})
+
+api.get('/posts/:id', async (c) => {
+  const id = c.req.param('id')
+  const post = await model.getPost(c.env.BLOG_EXAMPLE, id)
+  if (!post) {
+    return c.json({ error: 'Not Found', ok: false }, 404)
+  }
+  return c.json({ post: post, ok: true })
+})
+
+api.put('/posts/:id', async (c) => {
+  const id = c.req.param('id')
+  const post = await model.getPost(c.env.BLOG_EXAMPLE, id)
+  if (!post) {
+    return new Response(null, { status: 204 })
+  }
+  const param = await c.req.json()
+  const success = await model.updatePost(c.env.BLOG_EXAMPLE, id, param as model.Param)
+  return c.json({ ok: success })
+})
+
+api.delete('/posts/:id', async (c) => {
+  const id = c.req.param('id')
+  const post = await model.getPost(c.env.BLOG_EXAMPLE, id)
+  if (!post) {
+    return new Response(null, { status: 204 })
+  }
+  const success = await model.deletePost(c.env.BLOG_EXAMPLE, id)
+  return c.json({ ok: success })
+})
+
+export default api
+`;
+
+/** https://github.com/honojs/examples — blog/src/index.ts (mount + root) */
+export const HONO_EXAMPLES_BLOG_INDEX = `
+import { Hono } from 'hono'
+import { basicAuth } from 'hono/basic-auth'
+import { prettyJSON } from 'hono/pretty-json'
+import api from './api'
+import { Bindings } from './bindings'
+
+const app = new Hono()
+app.get('/', (c) => c.text('Pretty Blog API'))
+app.notFound((c) => c.json({ message: 'Not Found', ok: false }, 404))
+
+const middleware = new Hono<{ Bindings: Bindings }>()
+middleware.use('*', prettyJSON())
+middleware.use('/posts/*', async (c, next) => {
+  if (c.req.method !== 'GET') {
+    const auth = basicAuth({ username: c.env.USERNAME, password: c.env.PASSWORD })
+    return auth(c, next)
+  } else {
+    await next()
+  }
+})
+
+app.route('/api', middleware)
+app.route('/api', api)
+
+export default app
+`;
+
+/** https://github.com/honojs/examples — basic/src/index.ts (same-file sub-router + verbs) */
+export const HONO_EXAMPLES_BASIC = `
+import { Hono } from 'hono'
+import { prettyJSON } from 'hono/pretty-json'
+
+const app = new Hono()
+
+app.get('/', (c) => c.text('Hono!!'))
+app.get('/hello', () => new Response('This is /hello'))
+app.get('/entry/:id', (c) => {
+  const id = c.req.param('id')
+  return c.text(\`Your ID is \${id}\`)
+})
+
+const book = new Hono()
+book.get('/', (c) => c.text('List Books'))
+book.get('/:id', (c) => {
+  const id = c.req.param('id')
+  return c.text('Get Book: ' + id)
+})
+book.post('/', (c) => c.text('Create Book'))
+app.route('/book', book)
+
+app.get('/api/posts', prettyJSON(), (c) => {
+  return c.json([])
+})
+app.post('/api/posts', (c) => c.json({ message: 'Created!' }, 201))
+
+export default app
+`;
+
+/** https://github.com/honojs/examples — docs patterns: basePath + chained + app.on */
+export const HONO_BASEPATH_CHAIN_ON = `
+import { Hono } from 'hono'
+
+const api = new Hono().basePath('/api/v1')
+api.get('/users', listUsers)
+api.post('/users', createUser)
+
+const app = new Hono()
+app
+  .get('/endpoint', (c) => c.text('GET /endpoint'))
+  .post((c) => c.text('POST /endpoint'))
+  .delete((c) => c.text('DELETE /endpoint'))
+
+app.on('PURGE', '/cache', purgeCache)
+app.on(['PUT', 'DELETE'], '/post', mutatePost)
+app.route('/', api)
+
+export default app
+`;
