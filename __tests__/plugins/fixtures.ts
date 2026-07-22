@@ -262,3 +262,182 @@ Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers
 Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
 Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
+
+/** https://github.com/falconry/falcon — examples/things.py */
+export const FALCON_THINGS_EXAMPLE = `
+# examples/things.py
+from wsgiref.simple_server import make_server
+
+import falcon
+
+
+class ThingsResource:
+    def on_get(self, req: falcon.Request, resp: falcon.Response) -> None:
+        """Handles GET requests"""
+        resp.status = falcon.HTTP_200
+        resp.content_type = falcon.MEDIA_TEXT
+        resp.text = 'hello'
+
+
+app = falcon.App()
+things = ThingsResource()
+app.add_route('/things', things)
+`;
+
+/**
+ * https://github.com/falconry/falcon — examples/things_advanced.py
+ * (resource + add_route; middleware omitted)
+ */
+export const FALCON_THINGS_ADVANCED = `
+import falcon
+
+class ThingsResource:
+    def __init__(self, db):
+        self.db = db
+
+    def on_get(self, req, resp, user_id):
+        resp.status = falcon.HTTP_200
+
+    @falcon.before(lambda *a, **k: None)
+    def on_post(self, req, resp, user_id):
+        resp.status = falcon.HTTP_201
+
+app = falcon.App()
+db = object()
+things = ThingsResource(db)
+app.add_route('/{user_id}/things', things)
+`;
+
+/**
+ * https://github.com/falconry/falcon — examples/asgilook/asgilook/app.py
+ * (ASGI App + suffixed responder route)
+ */
+export const FALCON_ASGILOOK_APP = `
+import falcon.asgi
+
+from .cache import RedisCache
+from .config import Config
+from .images import Images
+from .images import Thumbnails
+from .store import Store
+
+
+def create_app(config=None):
+    config = config or Config()
+    cache = RedisCache(config)
+    store = Store(config)
+    images = Images(config, store)
+    thumbnails = Thumbnails(store)
+
+    app = falcon.asgi.App(middleware=[cache])
+    app.add_route('/images', images)
+    app.add_route('/images/{image_id:uuid}.jpeg', images, suffix='image')
+    app.add_route(
+        '/thumbnails/{image_id:uuid}/{width:int}x{height:int}.jpeg', thumbnails
+    )
+
+    return app
+`;
+
+/** https://github.com/falconry/falcon — examples/asgilook/asgilook/images.py */
+export const FALCON_ASGILOOK_IMAGES = `
+import aiofiles
+import falcon
+
+
+class Images:
+    def __init__(self, config, store):
+        self._config = config
+        self._store = store
+
+    async def on_get(self, req, resp):
+        resp.media = []
+
+    async def on_get_image(self, req, resp, image_id):
+        raise falcon.HTTPNotFound
+
+    async def on_post(self, req, resp):
+        resp.status = falcon.HTTP_201
+
+
+class Thumbnails:
+    def __init__(self, store):
+        self._store = store
+
+    async def on_get(self, req, resp, image_id, width, height):
+        resp.content_type = falcon.MEDIA_JPEG
+`;
+
+/**
+ * https://github.com/tomasrasymas/falcon-restful-api-boilerplate — app.py
+ * (legacy falcon.API + imported resources)
+ */
+export const FALCON_BOILERPLATE_APP = `
+import falcon
+from resources.api_index import ApiIndexResource
+from resources.groups import GroupsResource
+from resources.group import GroupResource
+from resources.items import ItemsResource
+from resources.item import ItemResource
+from resources.group_items import GroupItemsResource
+from resources.group_item import GroupItemResource
+
+
+def get_app() -> falcon.API:
+    app = falcon.API(middleware=[])
+
+    app.add_route('/api', ApiIndexResource())
+    app.add_route('/api/groups', GroupsResource())
+    app.add_route('/api/groups/{id}', GroupResource())
+    app.add_route('/api/items', ItemsResource())
+    app.add_route('/api/items/{id}', ItemResource())
+    app.add_route('/api/group/{group_id}/items', GroupItemsResource())
+    app.add_route('/api/group/{group_id}/items/{item_id}', GroupItemResource())
+
+    return app
+`;
+
+/**
+ * https://github.com/linkedin/iris — src/iris/api.py (construct_falcon_api routes)
+ * Classes live in the same module in the real file; this excerpt keeps a
+ * representative Plan resource + add_route block.
+ */
+export const FALCON_IRIS_ROUTES = `
+from falcon import API
+import falcon
+
+
+class Plan:
+    def on_get(self, req, resp, plan_id):
+        resp.status = falcon.HTTP_200
+
+    def on_delete(self, req, resp, plan_id):
+        resp.status = falcon.HTTP_204
+
+
+class Plans:
+    def on_get(self, req, resp):
+        resp.status = falcon.HTTP_200
+
+    def on_post(self, req, resp):
+        resp.status = falcon.HTTP_201
+
+
+class Healthcheck:
+    def __init__(self, path):
+        self.path = path
+
+    def on_get(self, req, resp):
+        resp.status = falcon.HTTP_200
+
+
+def construct_falcon_api(debug, healthcheck_path, allowed_origins, iris_sender_app,
+                         zk_hosts, default_sender_addr, supported_timezones, config):
+    api = API(middleware=[])
+
+    api.add_route('/v0/plans/{plan_id}', Plan())
+    api.add_route('/v0/plans', Plans())
+    api.add_route('/healthcheck', Healthcheck(healthcheck_path))
+
+    return api
+`;

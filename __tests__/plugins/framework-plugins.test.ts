@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { falconResolver } from '../../src/plugins/falcon/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,12 +33,19 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  FALCON_THINGS_EXAMPLE,
+  FALCON_THINGS_ADVANCED,
+  FALCON_ASGILOOK_APP,
+  FALCON_ASGILOOK_IMAGES,
+  FALCON_BOILERPLATE_APP,
+  FALCON_IRIS_ROUTES,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
   it('exposes all Kerno built-in framework plugins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
+      'kerno-falcon',
       'kerno-go-http',
       'kerno-nestjs',
       'kerno-next-app-router',
@@ -45,6 +53,7 @@ describe('in-repo plugin registry', () => {
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
+      'falcon',
       'go',
       'laravel',
       'nestjs',
@@ -372,5 +381,107 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('falcon plugin (framework: Falcon)', () => {
+  it('extracts falconry/falcon things.py (same-file on_get)', () => {
+    const result = falconResolver.extract!('examples/things.py', FALCON_THINGS_EXAMPLE);
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /things']);
+    expect(result.references.map((r) => r.referenceName)).toEqual(['on_get']);
+  });
+
+  it('extracts falconry/falcon things_advanced.py (GET+POST)', () => {
+    const result = falconResolver.extract!(
+      'examples/things_advanced.py',
+      FALCON_THINGS_ADVANCED
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /{user_id}/things',
+      'POST /{user_id}/things',
+    ]);
+  });
+
+  it('extracts linkedin/iris-style API() add_route with responders', () => {
+    const result = falconResolver.extract!('src/iris/api.py', FALCON_IRIS_ROUTES);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /v0/plans/{plan_id}',
+      'GET /healthcheck',
+      'GET /v0/plans',
+      'GET /v0/plans/{plan_id}',
+      'POST /v0/plans',
+    ]);
+  });
+
+  it('emits probe routes for imported resources (boilerplate)', () => {
+    const result = falconResolver.extract!('app.py', FALCON_BOILERPLATE_APP);
+    const names = result.nodes.map((n) => n.name);
+    expect(names).toContain('GET /api/groups');
+    expect(names).toContain('POST /api/items/{id}');
+    // Imported resources → one probe per verb until postExtract.
+    expect(names.filter((n) => n.endsWith(' /api')).length).toBeGreaterThan(1);
+  });
+
+  it('postExtract keeps asgilook verbs from the Images resource file', () => {
+    const extracted = falconResolver.extract!(
+      'asgilook/app.py',
+      FALCON_ASGILOOK_APP
+    );
+    const files: Record<string, string> = {
+      'asgilook/app.py': FALCON_ASGILOOK_APP,
+      'asgilook/images.py': FALCON_ASGILOOK_IMAGES,
+    };
+    const ctx = {
+      getNodesInFile: () => [],
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: (kind: string) => (kind === 'route' ? extracted.nodes : []),
+      iterateNodesByKind: (kind: string) =>
+        kind === 'route'
+          ? extracted.nodes[Symbol.iterator]()
+          : [][Symbol.iterator](),
+      fileExists: () => true,
+      readFile: (fp: string) => files[fp] ?? null,
+      getProjectRoot: () => '/test',
+      getAllFiles: () => Object.keys(files),
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    const updates = falconResolver.postExtract!(ctx as any);
+    const byId = new Map(extracted.nodes.map((n) => [n.id, n.name]));
+    for (const u of updates) byId.set(u.id, u.name);
+
+    const kept = [...byId.values()]
+      .filter((n) => /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+\//.test(n))
+      .sort();
+    expect(kept).toEqual([
+      'GET /images',
+      'GET /images/{image_id:uuid}.jpeg',
+      'GET /thumbnails/{image_id:uuid}/{width:int}x{height:int}.jpeg',
+      'POST /images',
+    ]);
+  });
+
+  it('detect() is positive for falcon requirements and negative otherwise', () => {
+    const pos = {
+      readFile: (f: string) => (f === 'requirements.txt' ? 'falcon>=3.1.0\n' : null),
+      fileExists: () => false,
+      getAllFiles: () => [] as string[],
+      getNodesByName: () => [],
+      getNodesByKind: () => [],
+      getNodesInFile: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+      getProjectRoot: () => '/p',
+    };
+    expect(falconResolver.detect(pos as any)).toBe(true);
+
+    const neg = {
+      ...pos,
+      readFile: (f: string) => (f === 'requirements.txt' ? 'django>=4.0\nflask\n' : null),
+      getAllFiles: () => ['app.py'],
+    };
+    expect(falconResolver.detect(neg as any)).toBe(false);
   });
 });
