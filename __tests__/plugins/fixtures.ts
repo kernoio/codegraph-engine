@@ -262,3 +262,114 @@ Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers
 Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
 Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
+
+/** https://github.com/PatilShreyas/NotyKT — noty-api/.../route/NoteRouter.kt (trimmed) */
+export const NOTYKT_NOTE_ROUTER = `
+package dev.shreyaspatil.noty.api.route
+
+import io.ktor.server.auth.authenticate
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.delete
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import io.ktor.server.routing.put
+import io.ktor.server.routing.route
+
+fun Route.notes() {
+    authenticate {
+        route("/notes/") {
+            get {
+                call.respond(notesResponse)
+            }
+
+            post {
+                call.respond(noteResponse)
+            }
+
+            route("/{id}") {
+                put {
+                    call.respond(noteResponse)
+                }
+
+                delete {
+                    call.respond(noteResponse)
+                }
+
+                route("/pin") {
+                    put {
+                        call.respond(pinned)
+                    }
+                    delete {
+                        call.respond(unpinned)
+                    }
+                }
+            }
+        }
+    }
+}
+`;
+
+/** https://github.com/raharrison/kotlin-ktor-exposed-starter — src/main/kotlin/web/WidgetResource.kt (trimmed) */
+export const KTOR_STARTER_WIDGET_RESOURCE = `
+package web
+
+import io.ktor.server.routing.*
+
+fun Route.widget(widgetService: WidgetService) {
+
+    route("/widgets") {
+
+        get {
+            call.respond(widgetService.getAllWidgets())
+        }
+
+        get("/{id}") {
+            call.respond(widget)
+        }
+
+        post {
+            call.respond(HttpStatusCode.Created, widgetService.addWidget(widget))
+        }
+
+        put {
+            call.respond(HttpStatusCode.OK, updated)
+        }
+
+        delete("/{id}") {
+            call.respond(HttpStatusCode.OK)
+        }
+
+    }
+
+    webSocket("/updates") {
+        // websocket — not an HTTP verb route
+    }
+}
+`;
+
+/** https://github.com/ktorio/ktor-samples — mvc-web/.../plugins/Routing.kt (trimmed) */
+export const KTOR_SAMPLES_WISH_ROUTING = `
+package com.example.plugins
+
+import io.ktor.server.application.*
+import io.ktor.server.routing.*
+
+fun Application.configureRouting() {
+    routing {
+        route("wish") {
+            post("make") {
+                call.respondRedirect("/wish/list")
+            }
+            get("list") {
+                call.respond(wishList)
+            }
+            post("cancel") {
+                call.respondRedirect("/wish/list")
+            }
+            get("topwishes") {
+                call.respond(topWishList)
+            }
+        }
+    }
+}
+`;

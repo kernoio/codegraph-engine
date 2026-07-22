@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { ktorResolver } from '../../src/plugins/ktor/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,6 +33,9 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  NOTYKT_NOTE_ROUTER,
+  KTOR_STARTER_WIDGET_RESOURCE,
+  KTOR_SAMPLES_WISH_ROUTING,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -39,6 +43,7 @@ describe('in-repo plugin registry', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
       'kerno-go-http',
+      'kerno-ktor',
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
@@ -46,6 +51,7 @@ describe('in-repo plugin registry', () => {
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
       'go',
+      'ktor',
       'laravel',
       'nestjs',
       'next-app-router',
@@ -372,5 +378,106 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('ktor plugin (framework: Ktor)', () => {
+  it('extracts nested NotyKT notes routes with authenticate + route prefixes', () => {
+    const result = ktorResolver.extract!(
+      'noty-api/application/src/main/kotlin/dev/shreyaspatil/noty/api/route/NoteRouter.kt',
+      NOTYKT_NOTE_ROUTER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /notes/{id}',
+      'DELETE /notes/{id}/pin',
+      'GET /notes',
+      'POST /notes',
+      'PUT /notes/{id}',
+      'PUT /notes/{id}/pin',
+    ]);
+  });
+
+  it('extracts kotlin-ktor-exposed-starter WidgetResource verbs', () => {
+    const result = ktorResolver.extract!(
+      'src/main/kotlin/web/WidgetResource.kt',
+      KTOR_STARTER_WIDGET_RESOURCE
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /widgets/{id}',
+      'GET /widgets',
+      'GET /widgets/{id}',
+      'POST /widgets',
+      'PUT /widgets',
+    ]);
+  });
+
+  it('joins path segments without leading slashes (ktor-samples mvc-web)', () => {
+    const result = ktorResolver.extract!(
+      'mvc-web/src/main/kotlin/com/example/plugins/Routing.kt',
+      KTOR_SAMPLES_WISH_ROUTING
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /wish/list',
+      'GET /wish/topwishes',
+      'POST /wish/cancel',
+      'POST /wish/make',
+    ]);
+  });
+
+  it('emits references for ::handler method refs', () => {
+    const src = `
+import io.ktor.server.routing.*
+
+fun Route.api() {
+  get("/health", ::healthHandler)
+}
+`;
+    const result = ktorResolver.extract!('Api.kt', src);
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /health']);
+    expect(result.references.map((r) => r.referenceName)).toEqual(['healthHandler']);
+  });
+
+  it('ignores RestAssured client get/post helpers without Ktor routing imports', () => {
+    const src = `
+import io.restassured.RestAssured.*
+
+class WidgetResourceTest {
+  fun testGet() {
+    get("/widgets")
+    delete("/widgets/{id}", "1")
+  }
+}
+`;
+    const result = ktorResolver.extract!('src/test/kotlin/web/WidgetResourceTest.kt', src);
+    expect(result.nodes).toEqual([]);
+  });
+
+  it('detects Ktor via gradle dependency and rejects unrelated projects', () => {
+    const positive = {
+      getAllFiles: () => ['build.gradle.kts', 'src/Main.kt'],
+      readFile: (fp: string) =>
+        fp === 'build.gradle.kts'
+          ? 'dependencies { implementation("io.ktor:ktor-server-netty:2.3.7") }'
+          : null,
+      fileExists: () => false,
+      getNodesInFile: () => [],
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: () => [],
+      getProjectRoot: () => '/tmp',
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    expect(ktorResolver.detect(positive as any)).toBe(true);
+
+    const negative = {
+      ...positive,
+      getAllFiles: () => ['build.gradle.kts', 'src/Main.kt'],
+      readFile: (fp: string) =>
+        fp === 'build.gradle.kts'
+          ? 'dependencies { implementation("org.springframework.boot:spring-boot-starter-web") }'
+          : 'package demo\nfun main() {}',
+    };
+    expect(ktorResolver.detect(negative as any)).toBe(false);
   });
 });
