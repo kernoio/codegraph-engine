@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { aiohttpResolver } from '../../src/plugins/aiohttp/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,12 +33,18 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  AIOHTTP_DEMOS_POLLS_ROUTES,
+  AIOHTTP_DEMOS_BLOG_ROUTES,
+  AIOHTTP_STATUS_ROUTETABLE,
+  AIOHTTP_WORD_ADD_ROUTES,
+  AIOHTTP_VIEW_AND_SUBAPP,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
   it('exposes all Kerno built-in framework plugins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
+      'kerno-aiohttp',
       'kerno-go-http',
       'kerno-nestjs',
       'kerno-next-app-router',
@@ -45,6 +52,7 @@ describe('in-repo plugin registry', () => {
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
+      'aiohttp',
       'go',
       'laravel',
       'nestjs',
@@ -322,6 +330,128 @@ describe('nestjs plugin (framework: NestJS)', () => {
     const updates = nestjsKernoResolver.postExtract!(ctx as any);
     expect(updates).toHaveLength(1);
     expect(updates[0]!.name).toBe('GET /api/users');
+  });
+});
+
+describe('aiohttp plugin (framework: aiohttp)', () => {
+  it('extracts aio-libs/aiohttp-demos polls router.add_* routes', () => {
+    const result = aiohttpResolver.extract!(
+      'demos/polls/aiohttpdemo_polls/routes.py',
+      AIOHTTP_DEMOS_POLLS_ROUTES
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /poll/{question_id}',
+      'GET /poll/{question_id}/results',
+      'POST /poll/{question_id}/vote',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'index',
+      'poll',
+      'results',
+      'vote',
+    ]);
+  });
+
+  it('extracts aio-libs/aiohttp-demos blog router.add_* routes', () => {
+    const result = aiohttpResolver.extract!(
+      'demos/blog/aiohttpdemo_blog/routes.py',
+      AIOHTTP_DEMOS_BLOG_ROUTES
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /create',
+      'GET /login',
+      'POST /create',
+      'POST /login',
+      'POST /logout',
+    ]);
+  });
+
+  it('extracts dani3l0/Status RouteTableDef decorators', () => {
+    const result = aiohttpResolver.extract!('status.py', AIOHTTP_STATUS_ROUTETABLE);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /api/status',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'api',
+      'index',
+    ]);
+  });
+
+  it('extracts turtlesoupy web.get add_routes table (skips web.static)', () => {
+    const result = aiohttpResolver.extract!('website/main.py', AIOHTTP_WORD_ADD_ROUTES);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /api/random_word.json',
+      'GET /define_word',
+      'GET /favicon.ico',
+      'GET /shorten_word_url/{word}/{encrypt}',
+      'GET /w/{word}/{encrypt}',
+    ]);
+  });
+
+  it('extracts same-file View verbs and add_subapp prefix', () => {
+    const result = aiohttpResolver.extract!('app.py', AIOHTTP_VIEW_AND_SUBAPP);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /admin/resource',
+      'GET /admin/stats',
+      'POST /admin/stats',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'StatsView',
+      'StatsView',
+      'handle_resource',
+    ]);
+  });
+
+  it('detects aiohttp via requirements + route signal; rejects client-only', () => {
+    const positive = {
+      readFile: (f: string) => {
+        if (f === 'requirements.txt') return 'aiohttp==3.9.0\n';
+        if (f === 'routes.py') {
+          return 'from aiohttp import web\napp = web.Application()\napp.router.add_get("/", index)\n';
+        }
+        return null;
+      },
+      getAllFiles: () => ['requirements.txt', 'routes.py'],
+      fileExists: () => false,
+      getNodesByName: () => [],
+      getNodesInFile: () => [],
+      getImportMappings: () => [],
+    };
+    expect(aiohttpResolver.detect(positive as any)).toBe(true);
+
+    const clientOnly = {
+      readFile: (f: string) => {
+        if (f === 'requirements.txt') return 'aiohttp==3.9.0\n';
+        if (f === 'client.py') {
+          return 'import aiohttp\nasync def fetch():\n    async with aiohttp.ClientSession() as s:\n        await s.get("https://example.com")\n';
+        }
+        return null;
+      },
+      getAllFiles: () => ['requirements.txt', 'client.py'],
+      fileExists: () => false,
+      getNodesByName: () => [],
+      getNodesInFile: () => [],
+      getImportMappings: () => [],
+    };
+    expect(aiohttpResolver.detect(clientOnly as any)).toBe(false);
+
+    const flaskOnly = {
+      readFile: (f: string) => {
+        if (f === 'requirements.txt') return 'flask==3.0.0\n';
+        if (f === 'app.py') return 'from flask import Flask\napp = Flask(__name__)\n';
+        return null;
+      },
+      getAllFiles: () => ['requirements.txt', 'app.py'],
+      fileExists: () => false,
+      getNodesByName: () => [],
+      getNodesInFile: () => [],
+      getImportMappings: () => [],
+    };
+    expect(aiohttpResolver.detect(flaskOnly as any)).toBe(false);
   });
 });
 

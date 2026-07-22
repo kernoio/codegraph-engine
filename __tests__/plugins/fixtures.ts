@@ -262,3 +262,100 @@ Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers
 Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
 Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
+
+/** https://github.com/aio-libs/aiohttp-demos — demos/polls/aiohttpdemo_polls/routes.py */
+export const AIOHTTP_DEMOS_POLLS_ROUTES = `
+import pathlib
+
+from aiohttpdemo_polls.views import index, poll, results, vote
+
+PROJECT_ROOT = pathlib.Path(__file__).parent
+
+
+def setup_routes(app):
+    app.router.add_get("/", index)
+    app.router.add_get("/poll/{question_id}", poll, name="poll")
+    app.router.add_get("/poll/{question_id}/results", results, name="results")
+    app.router.add_post("/poll/{question_id}/vote", vote, name="vote")
+
+
+def setup_static_routes(app):
+    app.router.add_static("/static/", path=PROJECT_ROOT / "static", name="static")
+`;
+
+/** https://github.com/aio-libs/aiohttp-demos — demos/blog/aiohttpdemo_blog/routes.py */
+export const AIOHTTP_DEMOS_BLOG_ROUTES = `
+from aiohttpdemo_blog.views import index, login, logout, create_post
+
+
+def setup_routes(app):
+    app.router.add_get('/', index, name='index')
+    app.router.add_get('/login', login, name='login')
+    app.router.add_post('/login', login, name='login')
+    app.router.add_post('/logout', logout, name='logout')
+    app.router.add_get('/create', create_post, name='create-post')
+    app.router.add_post('/create', create_post, name='create-post')
+`;
+
+/** https://github.com/dani3l0/Status — status.py (trimmed RouteTableDef) */
+export const AIOHTTP_STATUS_ROUTETABLE = `
+from aiohttp import web
+
+routes = web.RouteTableDef()
+
+
+@routes.get("/")
+async def index(request):
+    return web.FileResponse("static/index.html")
+
+
+@routes.get("/api/status")
+async def api(request):
+    return web.json_response({})
+`;
+
+/** https://github.com/turtlesoupy/this-word-does-not-exist — website/main.py (trimmed add_routes) */
+export const AIOHTTP_WORD_ADD_ROUTES = `
+from aiohttp import web
+
+
+def app(handlers=None):
+    app = web.Application()
+    app.add_routes(
+        [
+            web.get("/", handlers.index),
+            web.get("/api/random_word.json", handlers.random_word_json),
+            web.get("/w/{word}/{encrypt}", handlers.word),
+            web.get("/shorten_word_url/{word}/{encrypt}", handlers.shorten_word_url),
+            web.get("/define_word", handlers.define_word),
+            web.get("/favicon.ico", handlers.favicon),
+            web.static("/static", "./website/static"),
+        ]
+    )
+    return app
+`;
+
+/** Same-file View + add_subapp (pattern from aiohttp docs / Software Heritage-style views). */
+export const AIOHTTP_VIEW_AND_SUBAPP = `
+from aiohttp import web
+
+
+class StatsView(web.View):
+    async def get(self):
+        return web.json_response({"ok": True})
+
+    async def post(self):
+        return web.json_response({"created": True})
+
+
+async def handle_resource(request):
+    return web.Response(text="ok")
+
+
+admin = web.Application()
+admin.router.add_get("/resource", handle_resource)
+admin.add_routes([web.view("/stats", StatsView)])
+
+app = web.Application()
+app.add_subapp("/admin/", admin)
+`;
