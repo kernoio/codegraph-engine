@@ -1,7 +1,8 @@
 /**
  * Go HTTP Framework Resolver (Kerno in-repo plugin)
  *
- * Gin, Echo, Chi, net/http, and gorilla/mux (including subrouter `.Handle("", h).Methods(...)`).
+ * Gin, Echo, Chi, Fiber, net/http, and gorilla/mux (including subrouter
+ * `.Handle("", h).Methods(...)` and Fiber/Gin nested `Group` / `Route` prefixes).
  * Cross-file mux prefix merging runs in postExtract (mattermost api4 pattern).
  */
 

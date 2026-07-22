@@ -1,8 +1,9 @@
 /**
- * Go HTTP route extraction — Gin, Chi, net/http, gorilla/mux.
+ * Go HTTP route extraction — Gin, Echo, Chi, Fiber, net/http, gorilla/mux.
  *
- * Kerno plugin: gorilla/mux subrouter `.Handle("", h).Methods(http.MethodPost)`
- * and cross-file PathPrefix / Routes-struct prefix merging live here (issue #7).
+ * Kerno plugin: gorilla/mux subrouter `.Handle("", h).Methods(http.MethodPost)`,
+ * cross-file PathPrefix / Routes-struct prefix merging (issue #7), and Fiber/Gin
+ * Group / Route callback prefixes with nested routers (issue #27).
  */
 
 import { Node } from '../../types';
@@ -24,9 +25,10 @@ export function extractGoHttpRoutes(filePath: string, content: string): GoRouteE
   const references: UnresolvedRef[] = [];
   const now = Date.now();
   const safe = stripCommentsForRegex(content, 'go');
+  const groupPrefixes = collectGroupVarPrefixes(safe);
 
   const routeHeadRe =
-    /(\b[\w.]+)\.(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD|Get|Post|Put|Patch|Delete|Handle|HandleFunc)\s*\(\s*"([^"]*)"\s*,\s*/g;
+    /(\b[\w.]+)\.(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD|CONNECT|TRACE|Get|Post|Put|Patch|Delete|Options|Head|Connect|Trace|All|Handle|HandleFunc)\s*\(\s*"([^"]*)"\s*,\s*/g;
 
   let head: RegExpExecArray | null;
   while ((head = routeHeadRe.exec(safe)) !== null) {
@@ -34,10 +36,12 @@ export function extractGoHttpRoutes(filePath: string, content: string): GoRouteE
     const rawMethod = head[2]!;
     const routePath = head[3]!;
     const handlerStart = head.index + head[0].length;
-    const handlerExpr = scanBalancedExpr(safe, handlerStart);
-    if (!handlerExpr) continue;
+    const { args, end: argsEnd } = scanCallArgs(safe, handlerStart);
+    if (args.length === 0) continue;
+    const handlerExpr = args[args.length - 1]!;
+    if (isStaticFileHandler(handlerExpr)) continue;
 
-    let end = handlerStart + handlerExpr.length;
+    let end = argsEnd;
     let chainedMethod: string | null = null;
     const closeParen = safe.slice(end).match(/^\s*\)/);
     if (closeParen) end += closeParen[0].length;
@@ -55,17 +59,23 @@ export function extractGoHttpRoutes(filePath: string, content: string): GoRouteE
 
     const methodPrefix = matchGo122MethodPattern(routePath, rawMethod);
     const isHandle = rawMethod === 'Handle' || rawMethod === 'HandleFunc';
+    const isAll = rawMethod === 'All';
+    const receiverLeaf = receiverLeafName(receiver);
+    const groupPrefix = groupPrefixes.get(receiverLeaf) ?? null;
 
-    if (!routePath.startsWith('/') && routePath !== '' && !methodPrefix) continue;
-    if (routePath === '' && !isHandle) continue;
+    if (!routePath.startsWith('/') && routePath !== '' && !methodPrefix && !groupPrefix) continue;
+    if (routePath === '' && !isHandle && !groupPrefix) continue;
 
     const line = safe.slice(0, head.index).split('\n').length;
-    const path = methodPrefix ? routePath.slice(methodPrefix.length).trimStart() : routePath;
+    let path = methodPrefix ? routePath.slice(methodPrefix.length).trimStart() : routePath;
+    if (groupPrefix) path = joinGoPath(groupPrefix, path || '/');
+    path = normalizeGoRoutePath(path);
+
     const method = methodPrefix
       ? methodPrefix
       : chainedMethod
         ? chainedMethod
-        : isHandle
+        : isHandle || isAll
           ? 'ANY'
           : rawMethod.toUpperCase();
 
@@ -84,20 +94,66 @@ export function extractGoHttpRoutes(filePath: string, content: string): GoRouteE
     );
   }
 
+  // Fiber / Chi-style: r.Add([]string{"GET","POST"}, "/path", handler)
+  const addCallRe =
+    /\b([\w.]+)\.Add\s*\(\s*\[\]string\{([^}]+)\}\s*,\s*"([^"]+)"\s*,\s*/g;
+  let addMatch: RegExpExecArray | null;
+  while ((addMatch = addCallRe.exec(safe)) !== null) {
+    const receiver = addMatch[1]!;
+    const methods = parseMethodList(addMatch[2]!);
+    const routePath = addMatch[3]!;
+    const handlerStart = addMatch.index + addMatch[0].length;
+    const { args, end: argsEnd } = scanCallArgs(safe, handlerStart);
+    if (args.length === 0 || methods.length === 0) continue;
+    const handlerExpr = args[args.length - 1]!;
+    if (isStaticFileHandler(handlerExpr)) continue;
+
+    let end = argsEnd;
+    const closeParen = safe.slice(end).match(/^\s*\)/);
+    if (closeParen) end += closeParen[0].length;
+
+    const receiverLeaf = receiverLeafName(receiver);
+    const groupPrefix = groupPrefixes.get(receiverLeaf) ?? null;
+    if (!routePath.startsWith('/') && !groupPrefix) continue;
+
+    let path = groupPrefix ? joinGoPath(groupPrefix, routePath) : routePath;
+    path = normalizeGoRoutePath(path);
+    const line = safe.slice(0, addMatch.index).split('\n').length;
+    for (const method of methods) {
+      addGoRoute(
+        nodes,
+        references,
+        filePath,
+        line,
+        method,
+        path,
+        end - addMatch.index,
+        handlerExpr,
+        null,
+        now
+      );
+    }
+  }
+
   // Chi / gorilla: r.Method("GET", "/path", handler)
   const methodCallRe =
-    /\b\w+\.Method(?:s)?\s*\(\s*(?:\[\]string\{([^}]*)\}|"([A-Z]+)")\s*,\s*"([^"]+)"\s*,\s*([^)]+)\)/g;
+    /\b([\w.]+)\.Method(?:s)?\s*\(\s*(?:\[\]string\{([^}]*)\}|"([A-Z]+)")\s*,\s*"([^"]+)"\s*,\s*([^)]+)\)/g;
   let match: RegExpExecArray | null;
   while ((match = methodCallRe.exec(safe)) !== null) {
-    const methodsRaw = match[1] ?? match[2] ?? '';
-    const routePath = match[3]!;
-    const handlerExpr = match[4]!;
-    if (!routePath.startsWith('/')) continue;
+    const receiver = match[1]!;
+    const methodsRaw = match[2] ?? match[3] ?? '';
+    const routePath = match[4]!;
+    const handlerExpr = match[5]!;
+    const receiverLeaf = receiverLeafName(receiver);
+    const groupPrefix = groupPrefixes.get(receiverLeaf) ?? null;
+    if (!routePath.startsWith('/') && !groupPrefix) continue;
     const methods = methodsRaw.includes('"')
       ? Array.from(methodsRaw.matchAll(/"([A-Z]+)"/g)).map((m) => m[1]!)
       : methodsRaw
         ? [methodsRaw]
         : ['ANY'];
+    let path = groupPrefix ? joinGoPath(groupPrefix, routePath) : routePath;
+    path = normalizeGoRoutePath(path);
     const line = safe.slice(0, match.index).split('\n').length;
     for (const method of methods.length > 0 ? methods : ['ANY']) {
       addGoRoute(
@@ -106,7 +162,7 @@ export function extractGoHttpRoutes(filePath: string, content: string): GoRouteE
         filePath,
         line,
         method,
-        routePath,
+        path,
         match[0].length,
         handlerExpr,
         null,
@@ -115,7 +171,8 @@ export function extractGoHttpRoutes(filePath: string, content: string): GoRouteE
     }
   }
 
-  // Same-file PathPrefix stacking for fragment-only ANY routes.
+  // Same-file mux PathPrefix stacking for fragment-only ANY routes.
+  // Group/Route prefixes are applied via collectGroupVarPrefixes above — not here.
   const prefixes = collectGoPathPrefixes(safe);
   if (prefixes.length > 0) {
     for (const node of nodes) {
@@ -133,6 +190,52 @@ export function extractGoHttpRoutes(filePath: string, content: string): GoRouteE
   }
 
   return { nodes, references };
+}
+
+/**
+ * Collect Fiber/Gin/Echo Group and Fiber Route-callback variable → full prefix.
+ * Supports nested groups: `api := app.Group("/api"); auth := api.Group("/auth")`.
+ */
+export function collectGroupVarPrefixes(content: string): Map<string, string> {
+  const safe = stripCommentsForRegex(content, 'go');
+  const edges: Array<{ child: string; parent: string; path: string }> = [];
+
+  const groupRe = /\b(\w+)\s*:?=\s*([\w.]+)\.Group\(\s*"([^"]*)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = groupRe.exec(safe)) !== null) {
+    edges.push({
+      child: m[1]!,
+      parent: receiverLeafName(m[2]!),
+      path: m[3]!,
+    });
+  }
+
+  // Fiber: app.Route("/api/v1", func(r fiber.Router) { … })
+  const routeCbRe =
+    /\b([\w.]+)\.Route\(\s*"([^"]+)"\s*,\s*func\s*\(\s*(\w+)\b/g;
+  while ((m = routeCbRe.exec(safe)) !== null) {
+    edges.push({
+      child: m[3]!,
+      parent: receiverLeafName(m[1]!),
+      path: m[2]!,
+    });
+  }
+
+  const resolved = new Map<string, string>();
+  // Iterate until nested prefixes stabilize (bounded).
+  for (let pass = 0; pass < 8; pass++) {
+    let changed = false;
+    for (const edge of edges) {
+      const parentPrefix = resolved.get(edge.parent) ?? '';
+      const full = joinGoPath(parentPrefix || '/', edge.path || '/');
+      if (resolved.get(edge.child) !== full) {
+        resolved.set(edge.child, full);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  return resolved;
 }
 
 /** Collect mux subrouter field → path prefix from Routes struct comments and PathPrefix assignments. */
@@ -208,7 +311,7 @@ function addGoRoute(
 ): void {
   const displayPath = path === '' ? '/' : path.startsWith('/') ? path : `/${path}`;
   const qn =
-    `${filePath}::route:${path}` +
+    `${filePath}::route:${displayPath}` +
     (muxField ? `${GO_MUX_RECEIVER_MARKER}${muxField}` : '');
 
   const routeNode: Node = {
@@ -238,6 +341,44 @@ function addGoRoute(
       language: 'go',
     });
   }
+}
+
+/** Leaf identifier of a receiver expression (`api.BaseRoutes.Users` → `Users`). */
+function receiverLeafName(receiver: string): string {
+  const parts = receiver.split('.');
+  return parts[parts.length - 1] ?? receiver;
+}
+
+/** Normalize Fiber/Gin `:id` / `:id?` / `:id<int>` params to `{id}`. */
+function normalizeGoRoutePath(path: string): string {
+  return path.replace(/:([A-Za-z_][A-Za-z0-9_]*)(?:<[^>]+>)?\??/g, '{$1}');
+}
+
+function isStaticFileHandler(expr: string): boolean {
+  return /\bstatic\.New\b/.test(expr);
+}
+
+/** Scan comma-separated call args starting after the opening path argument's comma. */
+function scanCallArgs(source: string, start: number): { args: string[]; end: number } {
+  const args: string[] = [];
+  let i = start;
+  while (i < source.length) {
+    while (i < source.length && /\s/.test(source[i]!)) i++;
+    if (i >= source.length || source[i] === ')') break;
+    const expr = scanBalancedExpr(source, i);
+    if (!expr) break;
+    let j = i;
+    while (j < source.length && /\s/.test(source[j]!)) j++;
+    i = j + expr.length;
+    args.push(expr);
+    while (i < source.length && /\s/.test(source[i]!)) i++;
+    if (source[i] === ',') {
+      i++;
+      continue;
+    }
+    break;
+  }
+  return { args, end: i };
 }
 
 function extractMuxReceiverField(receiver: string): string | null {
@@ -338,7 +479,8 @@ interface GoPrefix {
 
 function collectGoPathPrefixes(safe: string): GoPrefix[] {
   const out: GoPrefix[] = [];
-  const re = /\.(?:PathPrefix|Route|Group)\(\s*"([^"]+)"/g;
+  // Only mux PathPrefix — Fiber/Gin Group + Fiber Route use collectGroupVarPrefixes.
+  const re = /\.PathPrefix\(\s*"([^"]+)"/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(safe)) !== null) {
     out.push({
