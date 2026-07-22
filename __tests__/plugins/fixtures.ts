@@ -262,3 +262,112 @@ Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers
 Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
 Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
+
+/**
+ * https://github.com/Introduction-to-Tornado/Introduction-to-Tornado
+ * — simple_web_services/string_service.py
+ */
+export const TORNADO_STRING_SERVICE = `
+import textwrap
+
+import tornado.httpserver
+import tornado.ioloop
+import tornado.options
+import tornado.web
+
+from tornado.options import define, options
+define("port", default=8888, help="run on the given port", type=int)
+
+class ReverseHandler(tornado.web.RequestHandler):
+	def get(self, input):
+		self.write(input[::-1])
+
+class WrapHandler(tornado.web.RequestHandler):
+	def post(self):
+		text = self.get_argument('text')
+		width = self.get_argument('width', 40)
+		self.write(textwrap.fill(text, int(width)))
+
+if __name__ == "__main__":
+	tornado.options.parse_command_line()
+	app = tornado.web.Application(handlers=[
+		(r"/reverse/(\\w+)", ReverseHandler),
+		(r"/wrap", WrapHandler)
+	])
+	http_server = tornado.httpserver.HTTPServer(app)
+	http_server.listen(options.port)
+	tornado.ioloop.IOLoop.instance().start()
+`;
+
+/**
+ * https://github.com/huashengdun/webssh — webssh/main.py (handlers table)
+ * plus IndexHandler verb methods from webssh/handler.py
+ */
+export const TORNADO_WEBSSH_MAIN = `
+import tornado.web
+import tornado.ioloop
+
+from webssh.handler import IndexHandler, WsockHandler, NotFoundHandler
+
+class IndexHandler(tornado.web.RequestHandler):
+    def head(self):
+        pass
+
+    def get(self):
+        pass
+
+    def post(self):
+        pass
+
+class WsockHandler(tornado.websocket.WebSocketHandler):
+    def get(self):
+        pass
+
+def make_handlers(loop, options):
+    handlers = [
+        (r'/', IndexHandler, dict(loop=loop)),
+        (r'/ws', WsockHandler, dict(loop=loop))
+    ]
+    return handlers
+
+def make_app(handlers, settings):
+    settings.update(default_handler_class=NotFoundHandler)
+    return tornado.web.Application(handlers, **settings)
+`;
+
+/**
+ * https://github.com/yann-shi/Young — app/user/urlmap.py
+ * (URLSpec tuples without a tornado import in the urlmap module)
+ */
+export const TORNADO_YOUNG_USER_URLMAP = `
+from handler import (
+    LoginHandler, LogoutHandler, AvatarStaticFileHandler,
+    RegisterTemplateHandler, RegisterHandler
+)
+
+urlpattern = (
+    (r'/login/?', LoginHandler),
+    (r'/logout/?', LogoutHandler),
+    (r'/avatar/([a-f0-9]{24})/?(thumbnail50x50|thumbnail180x180)?', AvatarStaticFileHandler),
+    (r'/register/template/?', RegisterTemplateHandler),
+    (r'/register/?', RegisterHandler),
+)
+`;
+
+/** url() / URLSpec form — Tornado guide structure example shape */
+export const TORNADO_URL_HELPER = `
+from tornado.web import Application, RequestHandler, url
+
+class MainHandler(RequestHandler):
+    def get(self):
+        pass
+
+class StoryHandler(RequestHandler):
+    def get(self, story_id):
+        pass
+
+app = Application([
+    url(r"/", MainHandler),
+    url(r"/story/([0-9]+)", StoryHandler, dict(db=None), name="story"),
+])
+`;

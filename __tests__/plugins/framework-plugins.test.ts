@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { tornadoResolver } from '../../src/plugins/tornado/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,6 +33,10 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  TORNADO_STRING_SERVICE,
+  TORNADO_WEBSSH_MAIN,
+  TORNADO_YOUNG_USER_URLMAP,
+  TORNADO_URL_HELPER,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -42,6 +47,7 @@ describe('in-repo plugin registry', () => {
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
+      'kerno-tornado',
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
@@ -49,6 +55,7 @@ describe('in-repo plugin registry', () => {
       'laravel',
       'nestjs',
       'next-app-router',
+      'tornado',
       'tsoa',
     ]);
   });
@@ -372,5 +379,74 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('tornado plugin (framework: Tornado)', () => {
+  it('extracts Introduction-to-Tornado string_service Application handlers', () => {
+    const result = tornadoResolver.extract!(
+      'simple_web_services/string_service.py',
+      TORNADO_STRING_SERVICE
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /reverse/{param}',
+      'POST /wrap',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'ReverseHandler',
+      'WrapHandler',
+    ]);
+  });
+
+  it('extracts webssh handlers with same-file verb inference', () => {
+    const result = tornadoResolver.extract!('webssh/main.py', TORNADO_WEBSSH_MAIN);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /ws',
+      'HEAD /',
+      'POST /',
+    ]);
+  });
+
+  it('extracts Young urlmap tuples without a tornado import', () => {
+    const result = tornadoResolver.extract!('app/user/urlmap.py', TORNADO_YOUNG_USER_URLMAP);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /avatar/{param}',
+      'GET /login',
+      'GET /logout',
+      'GET /register',
+      'GET /register/template',
+    ]);
+  });
+
+  it('extracts tornado.web.url / URLSpec helper form', () => {
+    const result = tornadoResolver.extract!('app.py', TORNADO_URL_HELPER);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /story/{param}',
+    ]);
+  });
+
+  it('detects Tornado via requirements.txt and rejects unrelated projects', () => {
+    const positive = {
+      readFile: (f: string) => (f === 'requirements.txt' ? 'tornado==6.4\n' : null),
+      fileExists: () => false,
+      getAllFiles: () => ['requirements.txt'],
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: () => [],
+      getNodesInFile: () => [],
+      getProjectRoot: () => '/proj',
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    expect(tornadoResolver.detect!(positive as any)).toBe(true);
+
+    const negative = {
+      ...positive,
+      readFile: (f: string) => (f === 'requirements.txt' ? 'flask==3.0\n' : null),
+      getAllFiles: () => ['requirements.txt', 'app.py'],
+    };
+    expect(tornadoResolver.detect!(negative as any)).toBe(false);
   });
 });
