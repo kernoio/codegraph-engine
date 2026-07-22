@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { bottleResolver } from '../../src/plugins/bottle/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,12 +33,17 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  BOTTLE_CRUD_CONTROLLER,
+  BOTTLE_SWIFT_TASKBOOK,
+  BOTTLE_KUMIKO_SERVER,
+  BOTTLE_APP_INSTANCE,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
   it('exposes all Kerno built-in framework plugins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
+      'kerno-bottle',
       'kerno-go-http',
       'kerno-nestjs',
       'kerno-next-app-router',
@@ -45,6 +51,7 @@ describe('in-repo plugin registry', () => {
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
+      'bottle',
       'go',
       'laravel',
       'nestjs',
@@ -372,5 +379,101 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('bottle plugin (framework: Bottle)', () => {
+  it('extracts bottle_crud stacked @route + typed wildcards', () => {
+    const result = bottleResolver.extract!(
+      'project/controllers/controller.py',
+      BOTTLE_CRUD_CONTROLLER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'GET /create',
+      'GET /delete/{no}',
+      'GET /index',
+      'GET /update/{no}',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'delete',
+      'index',
+      'index',
+      'new',
+      'update',
+    ]);
+  });
+
+  it('extracts swift taskbook @get/@post/@put/@delete + path filter', () => {
+    const result = bottleResolver.extract!('swift.py', BOTTLE_SWIFT_TASKBOOK);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /api/tasks',
+      'GET /',
+      'GET /api/logout',
+      'GET /api/session',
+      'GET /api/tasks',
+      'GET /api/version',
+      'GET /login',
+      'GET /tasks',
+      'GET /{filepath}',
+      'POST /api/login',
+      'POST /api/signup',
+      'POST /api/tasks',
+      'PUT /api/tasks',
+    ]);
+  });
+
+  it('extracts kumiko @route with spaced method= kwarg', () => {
+    const result = bottleResolver.extract!('server.py', BOTTLE_KUMIKO_SERVER);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /html',
+      'GET /static/{filename}',
+    ]);
+  });
+
+  it('extracts Bottle() instance routes, multi-method, and callback=', () => {
+    const result = bottleResolver.extract!('app.py', BOTTLE_APP_INSTANCE);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /hello',
+      'GET /login',
+      'GET /ping',
+      'GET /save',
+      'POST /login',
+      'POST /save',
+    ]);
+    expect(result.references.map((r) => r.referenceName)).toContain('ping_handler');
+  });
+
+  it('detects bottle from requirements and rejects unrelated projects', () => {
+    const positive = {
+      readFile: (f: string) => (f === 'requirements.txt' ? 'bottle==0.13.2\n' : null),
+      getAllFiles: () => ['requirements.txt'],
+      fileExists: () => true,
+      getProjectRoot: () => '/proj',
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: () => [],
+      iterateNodesByKind: () => [][Symbol.iterator](),
+      getNodesInFile: () => [],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    expect(bottleResolver.detect!(positive as any)).toBe(true);
+
+    const negative = {
+      ...positive,
+      readFile: (f: string) => (f === 'requirements.txt' ? 'flask==3.0\nbottleneck==1.3\n' : null),
+    };
+    expect(bottleResolver.detect!(negative as any)).toBe(false);
+  });
+
+  it('does not extract @route without a bottle import', () => {
+    const src = `
+@route('/oops')
+def oops():
+    return 'no'
+`;
+    const result = bottleResolver.extract!('other.py', src);
+    expect(result.nodes).toEqual([]);
   });
 });

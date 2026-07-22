@@ -262,3 +262,142 @@ Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers
 Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
 Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
+
+/** https://github.com/edsonlead/bottle_crud — project/controllers/controller.py */
+export const BOTTLE_CRUD_CONTROLLER = `
+import traceback
+import sqlite3
+from bottle import debug, error, redirect, request
+from bottle import route, run, static_file, template
+
+
+@route('/')
+@route('/index')
+def index():
+    conn = sqlite3.connect('checklist.db')
+    return template('index', rows=[])
+
+
+@route('/create', method='GET')
+def new():
+    return template('create_task.tpl')
+
+
+@route('/update/<no:int>', method='GET')
+def update(no):
+    return template('update_task', old=None, no=no)
+
+
+@route('/delete/<no:int>', method='GET')
+def delete(no):
+    return '<p>deleted</p>'
+`;
+
+/**
+ * https://github.com/cseitz/SoftwareEngineering-Team-TGMGPA — swift.py
+ * (trimmed; keeps @route / @get/@post/@put/@delete + path filter wildcard)
+ */
+export const BOTTLE_SWIFT_TASKBOOK = `
+from bottle import request, response
+from bottle import route, get, put, post, delete, redirect
+from bottle import template
+from bottle import static_file
+
+@route('/')
+@route('/tasks')
+def tasks():
+    return template('tasks.tpl')
+
+@route('/login')
+def login():
+    return template("login.tpl")
+
+@get('/api/version')
+def api_version():
+    return {"version": 0.1}
+
+@get('/api/session')
+def api_session():
+    return {}
+
+@post('/api/login')
+def api_login():
+    return {}
+
+@get('/api/logout')
+def api_logout():
+    return {}
+
+@post('/api/signup')
+def api_signup():
+    return {}
+
+@get('/api/tasks')
+def api_tasks_get():
+    return []
+
+@post('/api/tasks')
+def api_tasks_post():
+    return {}
+
+@put('/api/tasks')
+def api_tasks_put():
+    return {}
+
+@delete('/api/tasks')
+def api_tasks_delete():
+    return {}
+
+@get('/<filepath:path>')
+def server_static(filepath):
+    return static_file(filepath, root='.')
+`;
+
+/** https://github.com/njean42/kumiko — server.py */
+export const BOTTLE_KUMIKO_SERVER = `
+#!/usr/bin/env python3
+import os
+import json
+from bottle import route, run, request, static_file, abort
+
+@route('/html', method = 'GET')
+def html():
+    return "ok"
+
+@route('/static/<filename>', method = 'GET')
+def static(filename):
+    return static_file(filename, root = './')
+
+run(host = '127.0.0.1', port = 8091)
+`;
+
+/**
+ * Explicit Bottle() app + multi-method route + callback= form
+ * (docs: https://bottlepy.org/docs/dev/tutorial.html)
+ */
+export const BOTTLE_APP_INSTANCE = `
+from bottle import Bottle, route
+
+app = Bottle()
+
+@app.route('/hello')
+def hello():
+    return "Hello World!"
+
+@app.route('/save', method=['GET', 'POST'])
+def save():
+    return "saved"
+
+@app.get('/login')
+def login_form():
+    return "form"
+
+@app.post('/login')
+def do_login():
+    return "ok"
+
+app.route('/ping', callback=ping_handler)
+
+def ping_handler():
+    return "pong"
+`;
