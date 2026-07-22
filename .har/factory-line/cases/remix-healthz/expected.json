@@ -1,0 +1,10 @@
+{
+  "framework": "remix",
+  "source": "https://github.com/tale/headplane — app/routes/util/healthz.ts + app/routes.ts",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /api/info",
+    "GET /healthz",
+    "POST /api/color-scheme"
+  ]
+}

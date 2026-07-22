@@ -9,11 +9,17 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { remixResolver } from '../../src/plugins/remix/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
   filePathToAppRoute,
 } from '../../src/plugins/next-app-router/route-path';
+import {
+  filePathToRemixRoute,
+  flatRouteIdToPath,
+} from '../../src/plugins/remix/route-path';
+import { parseRoutesConfig, resolveRouteModulePath } from '../../src/plugins/remix/routes-config';
 import { reactResolver } from '../../src/resolution/frameworks/react';
 import { getBuiltInPlugins, getBuiltInPluginResolvers } from '../../src/plugins';
 import {
@@ -32,6 +38,11 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  HEADPLANE_HEALTHZ_LOADER,
+  HEADPLANE_COLOR_SCHEME_ACTION,
+  HEADPLANE_ROUTES_TS,
+  EPIC_STACK_HEALTHCHECK_LOADER,
+  EPIC_STACK_THEME_SWITCH_ACTION,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -42,6 +53,7 @@ describe('in-repo plugin registry', () => {
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
+      'kerno-remix',
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
@@ -49,6 +61,7 @@ describe('in-repo plugin registry', () => {
       'laravel',
       'nestjs',
       'next-app-router',
+      'remix',
       'tsoa',
     ]);
   });
@@ -372,5 +385,143 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('remix plugin (framework: Remix / React Router framework mode)', () => {
+  it('extracts headplane healthz loader as GET from file convention', () => {
+    const result = remixResolver.extract!(
+      'app/routes/util/healthz.ts',
+      HEADPLANE_HEALTHZ_LOADER
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /util/healthz']);
+    expect(result.references.map((r) => r.referenceName)).toEqual(['loader']);
+  });
+
+  it('extracts headplane color-scheme action as POST', () => {
+    const result = remixResolver.extract!(
+      'app/routes/util/color-scheme.ts',
+      HEADPLANE_COLOR_SCHEME_ACTION
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(['POST /util/color-scheme']);
+  });
+
+  it('extracts epic-stack folder-nested healthcheck loader', () => {
+    const result = remixResolver.extract!(
+      'app/routes/resources/healthcheck.tsx',
+      EPIC_STACK_HEALTHCHECK_LOADER
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /resources/healthcheck']);
+  });
+
+  it('extracts epic-stack theme-switch action', () => {
+    const result = remixResolver.extract!(
+      'app/routes/resources/theme-switch.tsx',
+      EPIC_STACK_THEME_SWITCH_ACTION
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(['POST /resources/theme-switch']);
+  });
+
+  it('maps flat-route ids and pathless layouts', () => {
+    expect(flatRouteIdToPath('_index')).toBe('/');
+    expect(flatRouteIdToPath('about')).toBe('/about');
+    expect(flatRouteIdToPath('concerts.$city')).toBe('/concerts/{city}');
+    expect(flatRouteIdToPath('_auth.login')).toBe('/login');
+    expect(flatRouteIdToPath('concerts_.mine')).toBe('/concerts/mine');
+    expect(flatRouteIdToPath('sitemap[.]xml')).toBe('/sitemap.xml');
+    expect(filePathToRemixRoute('app/routes/($lang).categories.tsx')).toBe(
+      '/{lang}/categories'
+    );
+  });
+
+  it('parses headplane routes.ts helpers including prefix', () => {
+    const entries = parseRoutesConfig(HEADPLANE_ROUTES_TS);
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        { urlPath: '/healthz', modulePath: 'routes/util/healthz.ts' },
+        { urlPath: '/api/info', modulePath: 'routes/util/info.ts' },
+        { urlPath: '/api/color-scheme', modulePath: 'routes/util/color-scheme.ts' },
+        { urlPath: '/', modulePath: 'routes/home.tsx' },
+        { urlPath: '/machines', modulePath: 'routes/machines/overview.tsx' },
+        { urlPath: '/machines/{id}', modulePath: 'routes/machines/machine.tsx' },
+      ])
+    );
+  });
+
+  it('postExtract rewrites file-convention paths from routes.ts', () => {
+    const extracted = remixResolver.extract!(
+      'app/routes/util/healthz.ts',
+      HEADPLANE_HEALTHZ_LOADER
+    );
+    const route = extracted.nodes[0]!;
+    expect(route.name).toBe('GET /util/healthz');
+
+    const ctx = {
+      getAllFiles: () => ['app/routes.ts', 'app/routes/util/healthz.ts'],
+      readFile: (fp: string) => (fp === 'app/routes.ts' ? HEADPLANE_ROUTES_TS : null),
+      getNodesInFile: (fp: string) => (fp === 'app/routes/util/healthz.ts' ? [route] : []),
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: () => [],
+      iterateNodesByKind: () => [][Symbol.iterator](),
+      fileExists: () => true,
+      getProjectRoot: () => '/test',
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    const updates = remixResolver.postExtract!(ctx as any);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.name).toBe('GET /healthz');
+    expect(updates[0]!.id).toBe(route.id);
+  });
+
+  it('detects framework-mode deps and rejects plain react', () => {
+    const positive = {
+      getAllFiles: () => ['package.json', 'app/routes.ts'],
+      readFile: (fp: string) => {
+        if (fp === 'package.json') {
+          return JSON.stringify({
+            dependencies: { 'react-router': '^7', '@react-router/dev': '^7' },
+          });
+        }
+        return null;
+      },
+      getNodesInFile: () => [],
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: () => [],
+      iterateNodesByKind: () => [][Symbol.iterator](),
+      fileExists: () => true,
+      getProjectRoot: () => '/test',
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    expect(remixResolver.detect(positive as any)).toBe(true);
+
+    const negative = {
+      ...positive,
+      getAllFiles: () => ['package.json', 'src/App.tsx'],
+      readFile: (fp: string) =>
+        fp === 'package.json'
+          ? JSON.stringify({ dependencies: { react: '^18', 'react-router-dom': '^6' } })
+          : null,
+    };
+    expect(remixResolver.detect(negative as any)).toBe(false);
+  });
+
+  it('resolves module paths relative to routes.ts', () => {
+    expect(resolveRouteModulePath('app/routes.ts', 'routes/util/healthz.ts')).toBe(
+      'app/routes/util/healthz.ts'
+    );
+  });
+
+  it('ignores UI-only route modules without loader/action', () => {
+    const uiOnly = `
+export default function About() {
+  return <h1>About</h1>;
+}
+`;
+    const result = remixResolver.extract!('app/routes/about.tsx', uiOnly);
+    expect(result.nodes).toHaveLength(0);
   });
 });
