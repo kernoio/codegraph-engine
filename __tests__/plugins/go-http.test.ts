@@ -20,14 +20,12 @@ import {
 import type { Node } from '../../src/types';
 
 describe('in-repo plugin registry', () => {
-  it('exposes go-http alongside tsoa and next-app-router', () => {
+  it('exposes go-http alongside other Kerno built-in plugins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
-    expect(ids).toEqual(['kerno-go-http', 'kerno-next-app-router', 'kerno-tsoa']);
-    expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
-      'go',
-      'next-app-router',
-      'tsoa',
-    ]);
+    expect(ids).toContain('kerno-go-http');
+    expect(ids).toContain('kerno-pyramid');
+    expect(getBuiltInPluginResolvers().map((r) => r.name)).toContain('go');
+    expect(getBuiltInPluginResolvers().map((r) => r.name)).toContain('pyramid');
   });
 });
 

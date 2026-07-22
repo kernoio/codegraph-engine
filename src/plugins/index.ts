@@ -13,6 +13,7 @@ import nextAppRouterPlugin, { nextAppRouterResolver } from './next-app-router';
 import nestjsKernoPlugin, { nestjsKernoResolver } from './nestjs-kerno';
 import goHttpPlugin, { goHttpResolver } from './go-http';
 import phpHttpRoutesPlugin, { phpHttpRoutesResolver } from './php-http-routes';
+import pyramidPlugin, { pyramidResolver } from './pyramid';
 
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
@@ -20,6 +21,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   nestjsKernoPlugin,
   goHttpPlugin,
   phpHttpRoutesPlugin,
+  pyramidPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -36,4 +38,5 @@ export {
   nestjsKernoResolver,
   goHttpResolver,
   phpHttpRoutesResolver,
+  pyramidResolver,
 };
