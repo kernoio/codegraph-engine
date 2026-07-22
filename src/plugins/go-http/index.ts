@@ -1,5 +1,5 @@
 /**
- * In-repo CodeGraph plugin: Go HTTP routers (Gin, Chi, gorilla/mux, net/http).
+ * In-repo CodeGraph plugin: Go HTTP routers (Gin, Echo, Chi, Fiber, gorilla/mux, net/http).
  */
 
 import type { CodeGraphPlugin } from '../../plugin-system/api';

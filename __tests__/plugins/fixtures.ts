@@ -221,6 +221,56 @@ r.Method("GET", "/articles/{articleID}", getArticle)
 r.Methods([]string{"GET", "POST"}, "/search", searchArticles)
 `;
 
+/** https://github.com/gofiber/recipes — auth-jwt/router/router.go (SetupRoutes) */
+export const FIBER_AUTH_JWT_ROUTES = `
+func SetupRoutes(app *fiber.App) {
+	api := app.Group("/api", logger.New())
+	api.Get("/", handlers.Hello)
+
+	auth := api.Group("/auth")
+	auth.Post("/login", authHandler.Login)
+	auth.Post("/register", authHandler.Register)
+	auth.Post("/logout", middleware.Protected(), authHandler.Logout)
+	auth.Post("/refresh-token", authHandler.RefreshToken)
+
+	user := api.Group("/users")
+	user.Get("/:id", middleware.Protected(), userHandler.GetUser)
+	user.Patch("/:id", middleware.Protected(), userHandler.UpdateUser)
+	user.Delete("/:id", middleware.Protected(), userHandler.DeleteUser)
+
+	product := api.Group("/products")
+	product.Get("/", productHandler.GetAllProducts)
+	product.Get("/:id", productHandler.GetProduct)
+	product.Post("/", middleware.Protected(), productHandler.CreateProduct)
+	product.Delete("/:id", middleware.Protected(), productHandler.DeleteProduct)
+}
+`;
+
+/** https://github.com/gofiber/boilerplate — app.go (v1 group + static catch-all skipped) */
+export const FIBER_BOILERPLATE_APP = `
+func main() {
+	app := fiber.New(fiber.Config{})
+	v1 := app.Group("/api/v1")
+	v1.Get("/users", handlers.UserList)
+	v1.Post("/users", handlers.UserCreate)
+	app.Get("/*", static.New("./static/public"))
+	app.Use(handlers.NotFound)
+}
+`;
+
+/** Fiber docs — Route callback + Add multi-method (https://docs.gofiber.io/guide/routing/) */
+export const FIBER_ROUTE_CALLBACK_AND_ADD = `
+func main() {
+	app := fiber.New()
+	app.Route("/api/v1", func(r fiber.Router) {
+		r.Get("/users", listUsers)
+		r.Post("/users", createUser)
+	}, "v1.")
+	app.Add([]string{"GET", "POST"}, "/health", healthCheck)
+	app.All("/ping", ping)
+}
+`;
+
 /** https://github.com/appwrite/appwrite — app/controllers/api/locale.php */
 export const APPWRITE_LOCALE_ROUTES = `
 Http::get('/v1/locale')
