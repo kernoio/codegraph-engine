@@ -16,7 +16,8 @@
     "sinatra-pizzerias",
     "grape-statuses",
     "symfony-blog",
-    "fastify-user-routes"
+    "fastify-user-routes",
+    "jaxrs-quarkus-fruits"
   ],
   "repos": [
     {

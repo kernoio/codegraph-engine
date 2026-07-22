@@ -27,6 +27,9 @@ import symfonyPlugin, { symfonyResolver } from './symfony';
 import fastifyPlugin, { fastifyResolver } from './fastify';
 
 
+import jaxrsPlugin, { jaxrsResolver } from './jaxrs';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -38,6 +41,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   sinatraGrapePlugin,
   symfonyPlugin,
   fastifyPlugin,
+  jaxrsPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -59,4 +63,5 @@ export {
   sinatraGrapeResolver,
   symfonyResolver,
   fastifyResolver,
+  jaxrsResolver,
 };

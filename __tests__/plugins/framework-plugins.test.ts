@@ -14,6 +14,7 @@ import { ktorResolver } from '../../src/plugins/ktor/resolver';
 import { sinatraGrapeResolver } from '../../src/plugins/sinatra-grape/resolver';
 import { symfonyResolver } from '../../src/plugins/symfony/resolver';
 import { fastifyResolver } from '../../src/plugins/fastify/resolver';
+import { jaxrsResolver } from '../../src/plugins/jaxrs/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -58,6 +59,10 @@ import {
   HMAKE_FASTIFY_USER_ROUTER,
   FASTIFY_ROUTE_PREFIX_EXAMPLE,
   FASTIFY_ROUTE_OBJECT,
+  DROPWIZARD_HELLO_WORLD_RESOURCE,
+  DROPWIZARD_PERSON_RESOURCE,
+  QUARKUS_GREETING_RESOURCE,
+  QUARKUS_FRUIT_RESOURCE,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -68,6 +73,7 @@ describe('in-repo plugin registry', () => {
       'kerno-go-http',
       'kerno-hono',
       'kerno-ktor',
+      'kerno-jaxrs',
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
@@ -80,6 +86,7 @@ describe('in-repo plugin registry', () => {
       'go',
       'hono',
       'ktor',
+      'jaxrs',
       'laravel',
       'nestjs',
       'next-app-router',
@@ -903,5 +910,83 @@ server.register(userRouter, { prefix: '/api/user' });
     const updates = fastifyResolver.postExtract!(ctx as any);
     expect(updates).toHaveLength(1);
     expect(updates[0]!.name).toBe('POST /api/user/login');
+describe('jaxrs plugin (framework: JAX-RS / Quarkus / Jersey / Dropwizard)', () => {
+  it('extracts dropwizard HelloWorldResource class+method @Path', () => {
+    const result = jaxrsResolver.extract!(
+      'dropwizard-example/src/main/java/com/example/helloworld/resources/HelloWorldResource.java',
+      DROPWIZARD_HELLO_WORLD_RESOURCE
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /hello-world',
+      'GET /hello-world/date',
+      'POST /hello-world',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'receiveDate',
+      'receiveHello',
+      'sayHello',
+    ]);
+  });
+
+  it('extracts dropwizard PersonResource path-param composition', () => {
+    const result = jaxrsResolver.extract!(
+      'dropwizard-example/src/main/java/com/example/helloworld/resources/PersonResource.java',
+      DROPWIZARD_PERSON_RESOURCE
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /people/{personId}',
+      'GET /people/{personId}/view_freemarker',
+      'GET /people/{personId}/view_mustache',
+    ]);
+  });
+
+  it('extracts quarkus GreetingResource (@Path after @GET)', () => {
+    const result = jaxrsResolver.extract!(
+      'getting-started/src/main/java/org/acme/getting/started/GreetingResource.java',
+      QUARKUS_GREETING_RESOURCE
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /hello',
+      'GET /hello/greeting/{name}',
+    ]);
+  });
+
+  it('extracts quarkus FruitResource GET/POST/DELETE', () => {
+    const result = jaxrsResolver.extract!(
+      'rest-json-quickstart/src/main/java/org/acme/rest/json/FruitResource.java',
+      QUARKUS_FRUIT_RESOURCE
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /fruits',
+      'GET /fruits',
+      'POST /fruits',
+    ]);
+  });
+
+  it('detects via pom.xml jakarta.ws.rs and rejects spring-only projects', () => {
+    const positive = {
+      getAllFiles: () => ['pom.xml'],
+      readFile: (f: string) =>
+        f === 'pom.xml'
+          ? '<dependency><groupId>jakarta.ws.rs</groupId><artifactId>jakarta.ws.rs-api</artifactId></dependency>'
+          : null,
+      fileExists: () => false,
+    };
+    expect(jaxrsResolver.detect!(positive as any)).toBe(true);
+
+    const negative = {
+      getAllFiles: () => ['pom.xml', 'src/Main.java'],
+      readFile: (f: string) => {
+        if (f === 'pom.xml') {
+          return '<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>';
+        }
+        if (f.endsWith('.java')) {
+          return '@RestController class Main { @GetMapping("/x") public String x() { return ""; } }';
+        }
+        return null;
+      },
+      fileExists: () => false,
+    };
+    expect(jaxrsResolver.detect!(negative as any)).toBe(false);
   });
 });

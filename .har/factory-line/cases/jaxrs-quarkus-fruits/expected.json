@@ -1,0 +1,10 @@
+{
+  "framework": "jaxrs",
+  "source": "https://github.com/quarkusio/quarkus-quickstarts — rest-json-quickstart/src/main/java/org/acme/rest/json/FruitResource.java",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /fruits",
+    "GET /fruits",
+    "POST /fruits"
+  ]
+}
