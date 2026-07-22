@@ -9,7 +9,8 @@
     "next-posts",
     "next-endpoint-scope",
     "django-users",
-    "nestjs-novu-widgets"
+    "nestjs-novu-widgets",
+    "jaxrs-quarkus-fruits"
   ],
   "repos": [
     {

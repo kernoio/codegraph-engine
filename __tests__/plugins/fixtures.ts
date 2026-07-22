@@ -262,3 +262,122 @@ Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers
 Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
 Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
+
+/** https://github.com/dropwizard/dropwizard — dropwizard-example/src/main/java/com/example/helloworld/resources/HelloWorldResource.java */
+export const DROPWIZARD_HELLO_WORLD_RESOURCE = `
+package com.example.helloworld.resources;
+
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+
+@Path("/hello-world")
+@Produces(MediaType.APPLICATION_JSON)
+public class HelloWorldResource {
+    @GET
+    public Saying sayHello() {
+        return null;
+    }
+
+    @POST
+    public void receiveHello(Saying saying) {
+    }
+
+    @GET
+    @Path("/date")
+    @Produces(MediaType.TEXT_PLAIN)
+    public String receiveDate() {
+        return null;
+    }
+}
+`;
+
+/** https://github.com/dropwizard/dropwizard — dropwizard-example/src/main/java/com/example/helloworld/resources/PersonResource.java */
+export const DROPWIZARD_PERSON_RESOURCE = `
+package com.example.helloworld.resources;
+
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+
+@Path("/people/{personId}")
+@Produces(MediaType.APPLICATION_JSON)
+public class PersonResource {
+    @GET
+    public Person getPerson(@PathParam("personId") long personId) {
+        return null;
+    }
+
+    @GET
+    @Path("/view_freemarker")
+    @Produces(MediaType.TEXT_HTML)
+    public PersonView getPersonViewFreemarker(@PathParam("personId") long personId) {
+        return null;
+    }
+
+    @GET
+    @Path("/view_mustache")
+    @Produces(MediaType.TEXT_HTML)
+    public PersonView getPersonViewMustache(@PathParam("personId") long personId) {
+        return null;
+    }
+}
+`;
+
+/** https://github.com/quarkusio/quarkus-quickstarts — getting-started/src/main/java/org/acme/getting/started/GreetingResource.java */
+export const QUARKUS_GREETING_RESOURCE = `
+package org.acme.getting.started;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+
+@Path("/hello")
+public class GreetingResource {
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    @Path("/greeting/{name}")
+    public String greeting(String name) {
+        return name;
+    }
+
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return "hello";
+    }
+}
+`;
+
+/** https://github.com/quarkusio/quarkus-quickstarts — rest-json-quickstart/src/main/java/org/acme/rest/json/FruitResource.java */
+export const QUARKUS_FRUIT_RESOURCE = `
+package org.acme.rest.json;
+
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+
+@Path("/fruits")
+public class FruitResource {
+    @GET
+    public Set<Fruit> list() {
+        return null;
+    }
+
+    @POST
+    public Set<Fruit> add(Fruit fruit) {
+        return null;
+    }
+
+    @DELETE
+    public Set<Fruit> delete(Fruit fruit) {
+        return null;
+    }
+}
+`;
