@@ -2891,4 +2891,99 @@ trait Service {
     }
   }
 }
+/** https://github.com/the-benchmarker/web-frameworks — python/pyramid/server.py */
+export const PYRAMID_BENCHMARKER_SERVER = `
+from pyramid.config import Configurator
+from pyramid.response import Response
+
+
+def empty(request):
+    return Response()
+
+
+def show(request):
+    return Response(request.matchdict["id"])
+
+
+with Configurator() as config:
+    config.add_route("index", "/")
+    config.add_route("create_user", "/user", request_method="POST")
+    config.add_route("get_user", "/user/{id}")
+    config.add_view(empty, route_name="index")
+    config.add_view(empty, route_name="create_user")
+    config.add_view(show, route_name="get_user")
+    app = config.make_wsgi_app()
+`;
+
+/**
+ * https://github.com/DataDog/trace-examples — python/pyramid/tasks.py
+ * (add_route + @view_config scan; trimmed to routes + one view)
+ */
+export const PYRAMID_DATADOG_TASKS = `
+from pyramid.config import Configurator
+from pyramid.view import view_config
+from pyramid.response import Response
+
+@view_config(route_name='list', renderer='list.mako')
+def list_view(request):
+    return {'tasks': []}
+
+@view_config(route_name='new', renderer='new.mako')
+def new_view(request):
+    return {}
+
+@view_config(route_name='close')
+def close_view(request):
+    return Response('ok')
+
+if __name__ == '__main__':
+    config = Configurator()
+    config.add_route('list', '/')
+    config.add_route('new', '/new')
+    config.add_route('close', '/close/{id}')
+    config.scan()
+    app = config.make_wsgi_app()
+`;
+
+/**
+ * https://github.com/slackapi/bolt-python — examples/pyramid/app.py
+ * (add_route + add_view with request_method on the view)
+ */
+export const PYRAMID_SLACK_BOLT_APP = `
+from pyramid.config import Configurator
+
+handler = type('H', (), {'handle': lambda *a, **k: None})()
+
+if __name__ == "__main__":
+    with Configurator() as config:
+        config.add_route("slack_events", "/slack/events")
+        config.add_view(handler.handle, route_name="slack_events", request_method="POST")
+        pyramid_app = config.make_wsgi_app()
+`;
+
+/**
+ * https://github.com/airbrake/pybrake — examples/pyramid/main.py
+ * (patterns without leading slash + @view_config)
+ */
+export const PYRAMID_AIRBRAKE_MAIN = `
+from pyramid.config import Configurator
+from pyramid.view import view_config
+from pyramid.response import Response
+
+@view_config(route_name='hello')
+def hello(request):
+    return Response('Hello')
+
+@view_config(route_name='weather', renderer='json')
+def weather(request):
+    return {}
+
+if __name__ == '__main__':
+    with Configurator() as config:
+        config.add_route('hello', '/')
+        config.add_route('date', 'date')
+        config.add_route('locations', 'locations')
+        config.add_route('weather', 'weather/{location_name}')
+        config.scan(".")
+        app = config.make_wsgi_app()
 `;

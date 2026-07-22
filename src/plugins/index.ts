@@ -75,6 +75,9 @@ import tornadoPlugin, { tornadoResolver } from './tornado';
 import akkaHttpPlugin, { akkaHttpResolver } from './akka-http';
 
 
+import pyramidPlugin, { pyramidResolver } from './pyramid';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -102,6 +105,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   http4sPlugin,
   tornadoPlugin,
   akkaHttpPlugin,
+  pyramidPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -139,4 +143,5 @@ export {
   http4sResolver,
   tornadoResolver,
   akkaHttpResolver,
+  pyramidResolver,
 };

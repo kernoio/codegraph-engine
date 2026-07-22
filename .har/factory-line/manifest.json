@@ -32,7 +32,8 @@
     "elysia-notes",
     "http4s-todo",
     "tornado-string-service",
-    "akka-http-users"
+    "akka-http-users",
+    "pyramid-benchmarker"
   ],
   "repos": [
     {

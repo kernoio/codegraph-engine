@@ -30,6 +30,7 @@ import { fastEndpointsResolver } from '../../src/plugins/fastendpoints/resolver'
 import { elysiaResolver } from '../../src/plugins/elysia/resolver';
 import { http4sResolver, parseHttp4sPath } from '../../src/plugins/http4s/resolver';
 import { tornadoResolver } from '../../src/plugins/tornado/resolver';
+import { pyramidResolver } from '../../src/plugins/pyramid/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -146,6 +147,10 @@ import {
   TORNADO_YOUNG_USER_URLMAP,
   TORNADO_URL_HELPER,
   AKKA_HTTP_USER_ROUTES,
+  PYRAMID_BENCHMARKER_SERVER,
+  PYRAMID_DATADOG_TASKS,
+  PYRAMID_SLACK_BOLT_APP,
+  PYRAMID_AIRBRAKE_MAIN,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -176,6 +181,7 @@ describe('in-repo plugin registry', () => {
       'kerno-sanic',
       'kerno-remix',
       'kerno-tornado',
+      'kerno-pyramid',
       'kerno-tsoa',
       'kerno-vertx-web',
     ]);
@@ -204,6 +210,7 @@ describe('in-repo plugin registry', () => {
       'sanic',
       'remix',
       'tornado',
+      'pyramid',
       'tsoa',
       'vertx-web',
     ]);
@@ -1324,6 +1331,17 @@ describe('tornado plugin (framework: Tornado)', () => {
       'add',
       'create',
       'list',
+describe('pyramid plugin (framework: Pyramid)', () => {
+  it('extracts the-benchmarker add_route + add_view with request_method', () => {
+    const result = pyramidResolver.extract!('server.py', PYRAMID_BENCHMARKER_SERVER);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'ANY /',
+      'ANY /user/{id}',
+      'POST /user',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'empty',
+      'empty',
       'show',
     ]);
   });
@@ -2478,5 +2496,107 @@ describe('akka-http plugin (framework: Akka HTTP / Pekko HTTP)', () => {
       'GET /users/{name}',
       'POST /users',
     ]);
+  it('extracts DataDog tasks add_route + @view_config handlers', () => {
+    const result = pyramidResolver.extract!('tasks.py', PYRAMID_DATADOG_TASKS);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'ANY /',
+      'ANY /close/{id}',
+      'ANY /new',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'close_view',
+      'list_view',
+      'new_view',
+    ]);
+  });
+
+  it('joins add_view request_method onto add_route (slack bolt)', () => {
+    const result = pyramidResolver.extract!('app.py', PYRAMID_SLACK_BOLT_APP);
+    expect(result.nodes.map((n) => n.name)).toEqual(['POST /slack/events']);
+    expect(result.references.map((r) => r.referenceName)).toEqual(['handle']);
+  });
+
+  it('normalizes patterns without a leading slash (airbrake)', () => {
+    const result = pyramidResolver.extract!('main.py', PYRAMID_AIRBRAKE_MAIN);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'ANY /',
+      'ANY /date',
+      'ANY /locations',
+      'ANY /weather/{location_name}',
+    ]);
+  });
+
+  it('detects pyramid from requirements and rejects unrelated projects', () => {
+    const positive = {
+      readFile: (f: string) => (f === 'requirements.txt' ? 'pyramid==2.0\n' : null),
+      fileExists: () => false,
+      getAllFiles: () => [] as string[],
+      getNodesByName: () => [],
+      getNodesByKind: () => [],
+      getNodesInFile: () => [],
+    };
+    expect(pyramidResolver.detect(positive as any)).toBe(true);
+
+    const negative = {
+      readFile: (f: string) => (f === 'requirements.txt' ? 'flask==3.0\n' : null),
+      fileExists: () => false,
+      getAllFiles: () => ['app.py'],
+      getNodesByName: () => [],
+      getNodesByKind: () => [],
+      getNodesInFile: () => [],
+    };
+    // Flask-only: no pyramid import + add_route
+    (negative as any).readFile = (f: string) => {
+      if (f === 'requirements.txt') return 'flask==3.0\n';
+      if (f === 'app.py') return 'from flask import Flask\napp = Flask(__name__)\n';
+      return null;
+    };
+    expect(pyramidResolver.detect(negative as any)).toBe(false);
+  });
+
+  it('postExtract upgrades ANY when a single cross-file request_method is found', () => {
+    const routeNode = {
+      id: 'route:routes.py:1:ANY:/events',
+      kind: 'route' as const,
+      name: 'ANY /events',
+      qualifiedName: 'routes.py::pyramid:slack_events:ANY:/events',
+      filePath: 'routes.py',
+      startLine: 1,
+      endLine: 1,
+      startColumn: 0,
+      endColumn: 0,
+      language: 'python' as const,
+      updatedAt: 0,
+    };
+    const ctx = {
+      getAllFiles: () => ['routes.py', 'views.py'],
+      readFile: (f: string) => {
+        if (f === 'routes.py') {
+          return `
+from pyramid.config import Configurator
+def includeme(config):
+    config.add_route('slack_events', '/events')
+`;
+        }
+        if (f === 'views.py') {
+          return `
+from pyramid.view import view_config
+@view_config(route_name='slack_events', request_method='POST')
+def handle_events(request):
+    return {}
+`;
+        }
+        return null;
+      },
+      getNodesByKind: () => [routeNode],
+      iterateNodesByKind: () => [routeNode][Symbol.iterator](),
+      getNodesByName: () => [],
+      getNodesInFile: () => [],
+      fileExists: () => false,
+    };
+    const updates = pyramidResolver.postExtract!(ctx as any);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.name).toBe('POST /events');
+    expect(updates[0]!.qualifiedName).toBe(routeNode.qualifiedName);
   });
 });
