@@ -40,6 +40,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CodeGraph now detects **Litestar** HTTP routes — including `@get`/`@post`/… semantic decorators, `@route(http_method=…)`, `Controller.path` prefixes, typed path params, and `Router(path=…)` mounts — so endpoint queries cover Litestar services.
 - CodeGraph now detects **AdonisJS** HTTP routes — including `Route`/`router` verb helpers, nested `.group().prefix()` stacks, and `resource()` / `apiOnly` / `only` / `params` — so endpoint queries cover AdonisJS v5 and v6 apps. (#35)
 - CodeGraph now detects **Vert.x Web** HTTP routes — including verb helpers (`router.get/post/...`), `route(HttpMethod, path)`, and nested routers via `mountSubRouter` / `.subRouter` — so endpoint queries cover Vert.x services.
+- CodeGraph now detects **Remix** and **React Router** framework-mode HTTP routes — including `app/routes.ts` helpers (`route` / `index` / `prefix` / `layout`), file-convention modules, and `loader`/`action` handlers — so endpoint queries cover framework-mode apps that the data-router extractor missed.
 
 ### Fixes
 

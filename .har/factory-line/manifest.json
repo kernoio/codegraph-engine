@@ -26,7 +26,8 @@
     "hapi-users",
     "litestar-translator",
     "adonisjs-learn",
-    "vertx-simple-rest"
+    "vertx-simple-rest",
+    "remix-healthz"
   ],
   "repos": [
     {
@@ -156,6 +157,14 @@
       "minRoutes": 3,
       "optional": true,
       "note": "Vert.x Web SimpleREST + siblings \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "headplane",
+      "url": "https://github.com/tale/headplane.git",
+      "shallow": true,
+      "minRoutes": 5,
+      "optional": true,
+      "note": "React Router framework-mode routes.ts + loader/action \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

@@ -2200,5 +2200,101 @@ public class HttpServerVerticle extends AbstractVerticle {
   private void apiCreatePage() {}
   private void apiUpdatePage() {}
   private void apiDeletePage() {}
+/** https://github.com/tale/headplane — app/routes/util/healthz.ts */
+export const HEADPLANE_HEALTHZ_LOADER = `
+import { headscaleContext } from "~/server/context";
+
+import type { Route } from "./+types/healthz";
+
+export async function loader({ context }: Route.LoaderArgs) {
+  const headscale = context.get(headscaleContext);
+  const healthy = await headscale.health();
+  return new Response(JSON.stringify({ status: healthy ? "OK" : "ERROR" }), {
+    status: healthy ? 200 : 500,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+`;
+
+/** https://github.com/tale/headplane — app/routes/util/color-scheme.ts */
+export const HEADPLANE_COLOR_SCHEME_ACTION = `
+import { data, redirect } from "react-router";
+
+import { isValidColorScheme, setColorScheme } from "~/utils/color-scheme";
+
+import type { Route } from "./+types/color-scheme";
+
+export async function action({ request }: Route.ActionArgs) {
+  const formData = await request.formData();
+  const colorScheme = formData.get("colorScheme");
+  if (!colorScheme || !isValidColorScheme(colorScheme)) {
+    throw data("Bad Request", { status: 400 });
+  }
+  return redirect("/", {
+    headers: { "Set-Cookie": await setColorScheme(colorScheme) },
+  });
+}
+`;
+
+/** https://github.com/tale/headplane — app/routes.ts (trimmed) */
+export const HEADPLANE_ROUTES_TS = `
+import { index, layout, prefix, route } from "@react-router/dev/routes";
+
+export default [
+  route("/healthz", "routes/util/healthz.ts"),
+  ...prefix("/api", [
+    route("/info", "routes/util/info.ts"),
+    route("/color-scheme", "routes/util/color-scheme.ts"),
+  ]),
+  layout("layout/app.tsx", [
+    index("routes/home.tsx"),
+    ...prefix("/machines", [
+      index("routes/machines/overview.tsx"),
+      route("/:id", "routes/machines/machine.tsx"),
+    ]),
+  ]),
+];
+`;
+
+/** https://github.com/epicweb-dev/epic-stack — app/routes/resources/healthcheck.tsx */
+export const EPIC_STACK_HEALTHCHECK_LOADER = `
+import { prisma } from '#app/utils/db.server.ts'
+import { type Route } from './+types/healthcheck.ts'
+
+export async function loader({ request }: Route.LoaderArgs) {
+  const host =
+    request.headers.get('X-Forwarded-Host') ?? request.headers.get('host')
+  try {
+    await Promise.all([
+      prisma.user.count(),
+      fetch(\`\${new URL(request.url).protocol}\${host}\`, {
+        method: 'HEAD',
+        headers: { 'X-Healthcheck': 'true' },
+      }).then((r) => {
+        if (!r.ok) return Promise.reject(r)
+      }),
+    ])
+    return new Response('OK')
+  } catch (error: unknown) {
+    console.log('healthcheck ❌', { error })
+    return new Response('ERROR', { status: 500 })
+  }
+}
+`;
+
+/** https://github.com/epicweb-dev/epic-stack — app/routes/resources/theme-switch.tsx (action only) */
+export const EPIC_STACK_THEME_SWITCH_ACTION = `
+import { data, redirect } from 'react-router'
+import { type Route } from './+types/theme-switch.ts'
+
+export async function action({ request }: Route.ActionArgs) {
+  const formData = await request.formData()
+  const theme = formData.get('theme')
+  if (theme !== 'light' && theme !== 'dark' && theme !== 'system') {
+    throw data('Invalid theme', { status: 400 })
+  }
+  return redirect('/', {
+    headers: { 'set-cookie': \`theme=\${theme}\` },
+  })
 }
 `;

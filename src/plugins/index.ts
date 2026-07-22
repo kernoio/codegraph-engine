@@ -57,6 +57,9 @@ import adonisjsPlugin, { adonisjsResolver } from './adonisjs';
 import vertxWebPlugin, { vertxWebResolver } from './vertx-web';
 
 
+import remixPlugin, { remixResolver } from './remix';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -78,6 +81,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   litestarPlugin,
   adonisjsPlugin,
   vertxWebPlugin,
+  remixPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -109,4 +113,5 @@ export {
   litestarResolver,
   adonisjsResolver,
   vertxWebResolver,
+  remixResolver,
 };
