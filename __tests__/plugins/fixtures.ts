@@ -262,3 +262,104 @@ Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers
 Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
 Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
+
+/**
+ * https://github.com/winstxnhdw/nllb-api — server/api/v4/translator.py
+ * Controller.path + empty/@get("/tokens") positional paths.
+ */
+export const NLLB_TRANSLATOR_CONTROLLER = `
+from litestar import Controller, Response, delete, get, post, put
+
+class TranslatorController(Controller):
+    path = "/translator"
+
+    @delete(guards=[requires_secret], sync_to_thread=True)
+    def unload_model(self, state: AppState) -> Response[None]:
+        return Response(content=None)
+
+    @put(guards=[requires_secret], sync_to_thread=True)
+    def load_model(self, state: AppState) -> Response[None]:
+        return Response(content=None)
+
+    @get("/tokens", cache=True, sync_to_thread=True)
+    def tokens(self, state: AppState, text: str) -> Tokens:
+        return Tokens(length=0)
+
+    @get(cache=True, sync_to_thread=True)
+    def translator_get(self, state: AppState, text: str) -> Translated:
+        return Translated(result="")
+
+    @post(status_code=HTTP_200_OK, sync_to_thread=True, deprecated=True)
+    def translator_post(self, state: AppState, data: Translation) -> Translated:
+        return Translated(result="")
+
+    @get("/stream", sync_to_thread=True)
+    def translator_stream(self, state: AppState, text: str) -> ServerSentEvent:
+        return ServerSentEvent([])
+`;
+
+/**
+ * https://github.com/litestar-org/litestar-fullstack — src/py/app/domain/accounts/controllers/_user.py
+ * Controller.path + path= kwarg with typed path params.
+ */
+export const LITESTAR_FULLSTACK_USER_CONTROLLER = `
+from litestar import Controller, delete, get, patch, post
+
+class UserController(Controller):
+    path = "/api/users"
+    tags = ["User Accounts"]
+
+    @get(operation_id="ListUsers")
+    async def list_users(self) -> None: ...
+
+    @get(operation_id="GetUser", path="/{user_id:uuid}")
+    async def get_user(self, user_id: UUID) -> None: ...
+
+    @post(operation_id="CreateUser")
+    async def create_user(self) -> None: ...
+
+    @patch(operation_id="UpdateUser", path="/{user_id:uuid}")
+    async def update_user(self, user_id: UUID) -> None: ...
+
+    @delete(operation_id="DeleteUser", path="/{user_id:uuid}")
+    async def delete_user(self, user_id: UUID) -> None: ...
+`;
+
+/**
+ * https://github.com/litestar-org/litestar-fullstack — src/py/app/domain/teams/controllers/_team.py
+ * Absolute path= on handlers (no Controller.path).
+ */
+export const LITESTAR_FULLSTACK_TEAM_CONTROLLER = `
+from litestar import Controller, delete, get, patch, post
+
+class TeamController(Controller):
+    tags = ["Teams"]
+
+    @get(component="team/list", operation_id="ListTeams", path="/api/teams")
+    async def list_teams(self) -> None: ...
+
+    @post(operation_id="CreateTeam", path="/api/teams")
+    async def create_team(self) -> None: ...
+
+    @get(operation_id="GetTeam", path="/api/teams/{team_id:uuid}")
+    async def get_team(self, team_id: UUID) -> None: ...
+
+    @patch(operation_id="UpdateTeam", path="/api/teams/{team_id:uuid}")
+    async def update_team(self, team_id: UUID) -> None: ...
+
+    @delete(operation_id="DeleteTeam", path="/api/teams/{team_id:uuid}")
+    async def delete_team(self, team_id: UUID) -> None: ...
+`;
+
+/** Synthetic — @route(http_method=…) + Router(path=…) remount via postExtract. */
+export const LITESTAR_ROUTE_AND_ROUTER = `
+from litestar import HttpMethod, Router, get, route
+
+@route(path="/health", http_method=[HttpMethod.GET, HttpMethod.HEAD])
+async def health() -> None: ...
+
+@get("/{order_id:int}")
+async def order_handler(order_id: int) -> None: ...
+
+order_router = Router(path="/orders", route_handlers=[order_handler])
+`;
