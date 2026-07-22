@@ -4,6 +4,13 @@
  */
 
 /** https://github.com/lightdash/lightdash — packages/backend/src/controllers/sshController.ts */
+
+/**
+ * Real-repository fixtures for framework plugins.
+ * Each snippet is trimmed from the cited path; keep attribution when updating.
+ */
+
+/** https://github.com/lightdash/lightdash — packages/backend/src/controllers/sshController.ts */
 export const LIGHTHASH_SSH_CONTROLLER = `
 import {
     Middlewares,
@@ -221,6 +228,48 @@ r.Method("GET", "/articles/{articleID}", getArticle)
 r.Methods([]string{"GET", "POST"}, "/search", searchArticles)
 `;
 
+/** https://github.com/appwrite/appwrite — app/controllers/api/locale.php */
+export const APPWRITE_LOCALE_ROUTES = `
+Http::get('/v1/locale')
+    ->desc('Get user locale')
+    ->groups(['api', 'locale'])
+    ->action(function () {});
+
+Http::get('/v1/locale/codes')
+    ->desc('List locale codes')
+    ->groups(['api', 'locale'])
+    ->action(function () {});
+
+Http::post('/v1/locale/currencies')
+    ->desc('List currencies')
+    ->groups(['api', 'locale'])
+    ->action(function () {});
+`;
+
+/** https://github.com/appwrite/appwrite — src/Appwrite/Platform/Modules/Functions/Http/Deployments/Vcs/Create.php */
+export const APPWRITE_PLATFORM_VCS_CREATE = `
+class Create extends Base
+{
+    use HTTP;
+
+    public function __construct()
+    {
+        $this
+            ->setHttpMethod(Action::HTTP_REQUEST_METHOD_POST)
+            ->setHttpPath('/v1/functions/:functionId/deployments/vcs')
+            ->desc('Create VCS deployment')
+            ->callback($this->action(...));
+    }
+}
+`;
+
+/** https://github.com/firefly-iii/firefly-iii — routes/web.php (Passport group) */
+export const FIREFLY_PASSPORT_ROUTES = `
+Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@storePersonalAccessToken', 'as' => 'personal.tokens.store']);
+Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
+Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
+`;
+
 /** https://github.com/gofiber/recipes — auth-jwt/router/router.go (SetupRoutes) */
 export const FIBER_AUTH_JWT_ROUTES = `
 func SetupRoutes(app *fiber.App) {
@@ -269,48 +318,6 @@ func main() {
 	app.Add([]string{"GET", "POST"}, "/health", healthCheck)
 	app.All("/ping", ping)
 }
-`;
-
-/** https://github.com/appwrite/appwrite — app/controllers/api/locale.php */
-export const APPWRITE_LOCALE_ROUTES = `
-Http::get('/v1/locale')
-    ->desc('Get user locale')
-    ->groups(['api', 'locale'])
-    ->action(function () {});
-
-Http::get('/v1/locale/codes')
-    ->desc('List locale codes')
-    ->groups(['api', 'locale'])
-    ->action(function () {});
-
-Http::post('/v1/locale/currencies')
-    ->desc('List currencies')
-    ->groups(['api', 'locale'])
-    ->action(function () {});
-`;
-
-/** https://github.com/appwrite/appwrite — src/Appwrite/Platform/Modules/Functions/Http/Deployments/Vcs/Create.php */
-export const APPWRITE_PLATFORM_VCS_CREATE = `
-class Create extends Base
-{
-    use HTTP;
-
-    public function __construct()
-    {
-        $this
-            ->setHttpMethod(Action::HTTP_REQUEST_METHOD_POST)
-            ->setHttpPath('/v1/functions/:functionId/deployments/vcs')
-            ->desc('Create VCS deployment')
-            ->callback($this->action(...));
-    }
-}
-`;
-
-/** https://github.com/firefly-iii/firefly-iii — routes/web.php (Passport group) */
-export const FIREFLY_PASSPORT_ROUTES = `
-Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@storePersonalAccessToken', 'as' => 'personal.tokens.store']);
-Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
-Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
 
 /** https://github.com/honojs/examples — blog/src/api.ts */
@@ -453,6 +460,8 @@ app.on(['PUT', 'DELETE'], '/post', mutatePost)
 app.route('/', api)
 
 export default app
+`;
+
 /** https://github.com/PatilShreyas/NotyKT — noty-api/.../route/NoteRouter.kt (trimmed) */
 export const NOTYKT_NOTE_ROUTER = `
 package dev.shreyaspatil.noty.api.route
@@ -495,140 +504,6 @@ fun Route.notes() {
                 }
             }
         }
-/**
- * https://github.com/symfony/demo — src/Controller/BlogController.php
- * (trimmed; PHP 8 attributes + class-level prefix)
- */
-export const SYMFONY_DEMO_BLOG_CONTROLLER = `
-<?php
-namespace App\\Controller;
-
-use Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController;
-use Symfony\\Component\\HttpFoundation\\Response;
-use Symfony\\Component\\Routing\\Attribute\\Route;
-use Symfony\\Component\\Routing\\Requirement\\Requirement;
-
-#[Route('/blog')]
-final class BlogController extends AbstractController
-{
-    #[Route('/', name: 'blog_index', defaults: ['page' => '1', '_format' => 'html'], methods: ['GET'])]
-    #[Route('/rss.xml', name: 'blog_rss', defaults: ['page' => '1', '_format' => 'xml'], methods: ['GET'])]
-    #[Route('/page/{page}', name: 'blog_index_paginated', defaults: ['_format' => 'html'], requirements: ['page' => Requirement::POSITIVE_INT], methods: ['GET'])]
-    public function index(): Response
-    {
-        return new Response();
-    }
-
-    #[Route('/posts/{slug:post}', name: 'blog_post', requirements: ['slug' => Requirement::ASCII_SLUG], methods: ['GET'])]
-    public function postShow(): Response
-    {
-        return new Response();
-    }
-
-    #[Route('/comment/{postSlug}/new', name: 'comment_new', methods: ['POST'])]
-    public function commentNew(): Response
-    {
-        return new Response();
-    }
-
-    #[Route('/search', name: 'blog_search', methods: ['GET'])]
-    public function search(): Response
-    {
-        return new Response();
-/** https://github.com/dropwizard/dropwizard — dropwizard-example/src/main/java/com/example/helloworld/resources/HelloWorldResource.java */
-export const DROPWIZARD_HELLO_WORLD_RESOURCE = `
-package com.example.helloworld.resources;
-
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-
-@Path("/hello-world")
-@Produces(MediaType.APPLICATION_JSON)
-public class HelloWorldResource {
-    @GET
-    public Saying sayHello() {
-        return null;
-    }
-
-    @POST
-    public void receiveHello(Saying saying) {
-    }
-
-    @GET
-    @Path("/date")
-    @Produces(MediaType.TEXT_PLAIN)
-    public String receiveDate() {
-        return null;
-/** https://github.com/sunecko/dotnet-fastendpoint-example — src/Example.Api/Endpoints/Auth/LoginEndpoint.cs */
-export const SUNECKO_LOGIN_ENDPOINT = `
-using FastEndpoints;
-
-namespace Example.Api.Endpoints.Auth;
-
-public class LoginEndpoint: Endpoint<LoginCommand, TokenResponse>
-{
-    public override void Configure()
-    {
-        Post("/auth/login");
-        AllowAnonymous();
-        Summary(x => x.Summary = "Get auth token");
-    }
-
-    public override async Task HandleAsync(LoginCommand req, CancellationToken ct)
-    {
-        var response = await req.ExecuteAsync(ct);
-        await SendAsync(response, statusCode: StatusCodes.Status200OK);
-/** https://github.com/akka/akka-http — samples/akka-http-quickstart-scala/src/main/scala/com/example/UserRoutes.scala */
-export const AKKA_HTTP_USER_ROUTES = `
-package com.example
-
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Route
-import com.example.UserRegistry._
-import akka.actor.typed.ActorRef
-import akka.actor.typed.ActorSystem
-
-class UserRoutes(userRegistry: ActorRef[UserRegistry.Command])(implicit val system: ActorSystem[_]) {
-  def getUsers(): Future[Users] = userRegistry.ask(GetUsers.apply)
-  def getUser(name: String): Future[GetUserResponse] = userRegistry.ask(GetUser(name, _))
-  def createUser(user: User): Future[ActionPerformed] = userRegistry.ask(CreateUser(user, _))
-  def deleteUser(name: String): Future[ActionPerformed] = userRegistry.ask(DeleteUser(name, _))
-
-  val userRoutes: Route =
-    pathPrefix("users") {
-      concat(
-        pathEnd {
-          concat(
-            get {
-              complete(getUsers())
-            },
-            post {
-              entity(as[User]) { user =>
-                onSuccess(createUser(user)) { performed =>
-                  complete((StatusCodes.Created, performed))
-                }
-              }
-            })
-        },
-        path(Segment) { name =>
-          concat(
-            get {
-              rejectEmptyResponse {
-                onSuccess(getUser(name)) { response =>
-                  complete(response.maybeUser)
-                }
-              }
-            },
-            delete {
-              onSuccess(deleteUser(name)) { performed =>
-                complete((StatusCodes.OK, performed))
-              }
-            })
-        })
     }
 }
 `;
@@ -667,36 +542,6 @@ fun Route.widget(widgetService: WidgetService) {
 
     webSocket("/updates") {
         // websocket — not an HTTP verb route
-/** https://github.com/dropwizard/dropwizard — dropwizard-example/src/main/java/com/example/helloworld/resources/PersonResource.java */
-export const DROPWIZARD_PERSON_RESOURCE = `
-package com.example.helloworld.resources;
-
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-
-@Path("/people/{personId}")
-@Produces(MediaType.APPLICATION_JSON)
-public class PersonResource {
-    @GET
-    public Person getPerson(@PathParam("personId") long personId) {
-        return null;
-    }
-
-    @GET
-    @Path("/view_freemarker")
-    @Produces(MediaType.TEXT_HTML)
-    public PersonView getPersonViewFreemarker(@PathParam("personId") long personId) {
-        return null;
-    }
-
-    @GET
-    @Path("/view_mustache")
-    @Produces(MediaType.TEXT_HTML)
-    public PersonView getPersonViewMustache(@PathParam("personId") long personId) {
-        return null;
     }
 }
 `;
@@ -726,6 +571,8 @@ fun Application.configureRouting() {
         }
     }
 }
+`;
+
 /** https://github.com/antirez/lamernews — app.rb (trimmed top-level Sinatra DSL) */
 export const LAMERNEWS_SINATRA_ROUTES = `
 require 'sinatra'
@@ -879,6 +726,52 @@ module Acme
     end
   end
 end
+`;
+
+/**
+ * https://github.com/symfony/demo — src/Controller/BlogController.php
+ * (trimmed; PHP 8 attributes + class-level prefix)
+ */
+export const SYMFONY_DEMO_BLOG_CONTROLLER = `
+<?php
+namespace App\\Controller;
+
+use Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController;
+use Symfony\\Component\\HttpFoundation\\Response;
+use Symfony\\Component\\Routing\\Attribute\\Route;
+use Symfony\\Component\\Routing\\Requirement\\Requirement;
+
+#[Route('/blog')]
+final class BlogController extends AbstractController
+{
+    #[Route('/', name: 'blog_index', defaults: ['page' => '1', '_format' => 'html'], methods: ['GET'])]
+    #[Route('/rss.xml', name: 'blog_rss', defaults: ['page' => '1', '_format' => 'xml'], methods: ['GET'])]
+    #[Route('/page/{page}', name: 'blog_index_paginated', defaults: ['_format' => 'html'], requirements: ['page' => Requirement::POSITIVE_INT], methods: ['GET'])]
+    public function index(): Response
+    {
+        return new Response();
+    }
+
+    #[Route('/posts/{slug:post}', name: 'blog_post', requirements: ['slug' => Requirement::ASCII_SLUG], methods: ['GET'])]
+    public function postShow(): Response
+    {
+        return new Response();
+    }
+
+    #[Route('/comment/{postSlug}/new', name: 'comment_new', methods: ['POST'])]
+    public function commentNew(): Response
+    {
+        return new Response();
+    }
+
+    #[Route('/search', name: 'blog_search', methods: ['GET'])]
+    public function search(): Response
+    {
+        return new Response();
+    }
+}
+`;
+
 /**
  * https://github.com/symfony/demo (v1.6.3) — src/Controller/BlogController.php
  * Legacy Sensio/Annotation \`@Route\` docblock form.
@@ -920,52 +813,7 @@ class BlogController extends AbstractController
     public function commentNew(): Response
     {
         return new Response();
-/** https://github.com/quarkusio/quarkus-quickstarts — getting-started/src/main/java/org/acme/getting/started/GreetingResource.java */
-export const QUARKUS_GREETING_RESOURCE = `
-package org.acme.getting.started;
-
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.MediaType;
-
-@Path("/hello")
-public class GreetingResource {
-    @GET
-    @Produces(MediaType.TEXT_PLAIN)
-    @Path("/greeting/{name}")
-    public String greeting(String name) {
-        return name;
     }
-
-    @GET
-    @Produces(MediaType.TEXT_PLAIN)
-    public String hello() {
-        return "hello";
-    }
-/** https://github.com/vert-x3/vertx-examples — web-examples/.../rest/SimpleREST.java */
-export const VERTX_SIMPLE_REST = `
-package io.vertx.example.web.rest;
-
-import io.vertx.core.AbstractVerticle;
-import io.vertx.ext.web.Router;
-import io.vertx.ext.web.RoutingContext;
-import io.vertx.ext.web.handler.BodyHandler;
-
-public class SimpleREST extends AbstractVerticle {
-  @Override
-  public void start() {
-    Router router = Router.router(vertx);
-    router.route().handler(BodyHandler.create());
-    router.get("/products/:productID").handler(this::handleGetProduct);
-    router.put("/products/:productID").handler(this::handleAddProduct);
-    router.get("/products").handler(this::handleListProducts);
-    vertx.createHttpServer().requestHandler(router).listen(8080);
-  }
-
-  private void handleGetProduct(RoutingContext routingContext) {}
-  private void handleAddProduct(RoutingContext routingContext) {}
-  private void handleListProducts(RoutingContext routingContext) {}
 }
 `;
 
@@ -1005,6 +853,8 @@ export const SYMFONY_DOCS_ROUTES_XML = `
     <route id="blog_list" path="/blog" controller="App\\Controller\\BlogController::list" methods="GET"/>
     <route id="blog_show" path="/blog/{slug}" controller="App\\Controller\\BlogController::show" methods="GET|HEAD"/>
 </routes>
+`;
+
 /** https://github.com/fastify/demo — src/routes/api/tasks/index.ts (trimmed to CRUD verbs) */
 export const FASTIFY_DEMO_TASKS_ROUTES = `
 import {
@@ -1198,41 +1048,6 @@ const opts = {
         type: 'object',
         properties: {
           greet: { type: 'string' }
-/** https://github.com/arhelmus/akka-http-rest — src/main/scala/me/archdev/restapi/http/routes/AuthRoute.scala */
-export const AKKA_HTTP_AUTH_ROUTE = `
-package me.archdev.restapi.http.routes
-
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Directives._
-import me.archdev.restapi.core.auth.AuthService
-
-import scala.concurrent.ExecutionContext
-
-class AuthRoute(authService: AuthService)(implicit executionContext: ExecutionContext) {
-  import StatusCodes._
-  import authService._
-
-  val route = pathPrefix("auth") {
-    path("signIn") {
-      pathEndOrSingleSlash {
-        post {
-          entity(as[LoginPassword]) { loginPassword =>
-            complete(
-              signIn(loginPassword.login, loginPassword.password).map {
-                case Some(token) => OK         -> token.asJson
-                case None        => BadRequest -> None.asJson
-              }
-            )
-          }
-        }
-      }
-    } ~
-    path("signUp") {
-      pathEndOrSingleSlash {
-        post {
-          entity(as[UsernamePasswordEmail]) { userEntity =>
-            complete(Created -> signUp(userEntity.username, userEntity.email, userEntity.password))
-          }
         }
       }
     }
@@ -1284,6 +1099,99 @@ fastify.route({
   url: '/items/:id',
   handler: updateItem
 })
+`;
+
+/** https://github.com/dropwizard/dropwizard — dropwizard-example/src/main/java/com/example/helloworld/resources/HelloWorldResource.java */
+export const DROPWIZARD_HELLO_WORLD_RESOURCE = `
+package com.example.helloworld.resources;
+
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+
+@Path("/hello-world")
+@Produces(MediaType.APPLICATION_JSON)
+public class HelloWorldResource {
+    @GET
+    public Saying sayHello() {
+        return null;
+    }
+
+    @POST
+    public void receiveHello(Saying saying) {
+    }
+
+    @GET
+    @Path("/date")
+    @Produces(MediaType.TEXT_PLAIN)
+    public String receiveDate() {
+        return null;
+    }
+}
+`;
+
+/** https://github.com/dropwizard/dropwizard — dropwizard-example/src/main/java/com/example/helloworld/resources/PersonResource.java */
+export const DROPWIZARD_PERSON_RESOURCE = `
+package com.example.helloworld.resources;
+
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+
+@Path("/people/{personId}")
+@Produces(MediaType.APPLICATION_JSON)
+public class PersonResource {
+    @GET
+    public Person getPerson(@PathParam("personId") long personId) {
+        return null;
+    }
+
+    @GET
+    @Path("/view_freemarker")
+    @Produces(MediaType.TEXT_HTML)
+    public PersonView getPersonViewFreemarker(@PathParam("personId") long personId) {
+        return null;
+    }
+
+    @GET
+    @Path("/view_mustache")
+    @Produces(MediaType.TEXT_HTML)
+    public PersonView getPersonViewMustache(@PathParam("personId") long personId) {
+        return null;
+    }
+}
+`;
+
+/** https://github.com/quarkusio/quarkus-quickstarts — getting-started/src/main/java/org/acme/getting/started/GreetingResource.java */
+export const QUARKUS_GREETING_RESOURCE = `
+package org.acme.getting.started;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+
+@Path("/hello")
+public class GreetingResource {
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    @Path("/greeting/{name}")
+    public String greeting(String name) {
+        return name;
+    }
+
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return "hello";
+    }
+}
+`;
+
 /** https://github.com/quarkusio/quarkus-quickstarts — rest-json-quickstart/src/main/java/org/acme/rest/json/FruitResource.java */
 export const QUARKUS_FRUIT_RESOURCE = `
 package org.acme.rest.json;
@@ -1309,6 +1217,9 @@ public class FruitResource {
     public Set<Fruit> delete(Fruit fruit) {
         return null;
     }
+}
+`;
+
 /** https://github.com/kestra-io/kestra — webserver/.../controllers/api/HelloController-shaped MiscController (trimmed) */
 export const KESTRA_MISC_CONTROLLER = `
 package io.kestra.webserver.controllers.api;
@@ -1465,6 +1376,8 @@ class HelloController {
     @Produces(MediaType.TEXT_PLAIN)
     fun index(): String = "Hello World"
 }
+`;
+
 /** https://github.com/koajs/examples — blog/app.js (chained @koa/router verbs) */
 export const KOA_EXAMPLES_BLOG_APP = `
 const render = require('./lib/render');
@@ -1562,6 +1475,8 @@ apiRouter.use('/users', usersRouter.routes());
 
 function getUsers(ctx) { ctx.body = []; }
 function getUser(ctx) { ctx.body = { id: ctx.params.id }; }
+`;
+
 /** https://github.com/slimphp/Slim-Skeleton — app/routes.php */
 export const SLIM_SKELETON_ROUTES = `
 <?php
@@ -1654,6 +1569,7 @@ $app->get('/[{name}]',
         return $this->renderer->render($response, 'index.phtml', $args);
     });
 `;
+
 /** https://github.com/aio-libs/aiohttp-demos — demos/polls/aiohttpdemo_polls/routes.py */
 export const AIOHTTP_DEMOS_POLLS_ROUTES = `
 import pathlib
@@ -1749,6 +1665,8 @@ admin.add_routes([web.view("/stats", StatsView)])
 
 app = web.Application()
 app.add_subapp("/admin/", admin)
+`;
+
 /** https://github.com/howie6879/owllook — owllook/views/api_blueprint.py (trimmed) */
 export const OWLLOOK_API_BLUEPRINT = `
 from sanic import Blueprint
@@ -1858,6 +1776,8 @@ class ProtectedView(HTTPMethodView):
 
 app.add_route(PublicView.as_view(), "/")
 app.add_route(ProtectedView.as_view(), "/protected")
+`;
+
 /** https://github.com/jbuget/nodejs-clean-architecture-app — lib/interfaces/routes/users.js */
 export const HAPI_CLEAN_ARCH_USERS = `
 'use strict';
@@ -2038,6 +1958,8 @@ await server.register(function (server, options) {
     handler: healthCheck,
   });
 }, { routes: { prefix: '/api' } });
+`;
+
 /**
  * https://github.com/winstxnhdw/nllb-api — server/api/v4/translator.py
  * Controller.path + empty/@get("/tokens") positional paths.
@@ -2137,6 +2059,8 @@ async def health() -> None: ...
 async def order_handler(order_id: int) -> None: ...
 
 order_router = Router(path="/orders", route_handlers=[order_handler])
+`;
+
 /**
  * https://github.com/adonisjs-community/polls-app — start/routes.ts
  * AdonisJS v5 `Route.*` facade with string controller handlers.
@@ -2234,6 +2158,34 @@ router.get('/', [HomeController])
 router.on('/about').render('about')
 router.resource('blog', BlogController).params({ blog: 'slug' }).only(['index', 'show'])
 `;
+
+/** https://github.com/vert-x3/vertx-examples — web-examples/.../rest/SimpleREST.java */
+export const VERTX_SIMPLE_REST = `
+package io.vertx.example.web.rest;
+
+import io.vertx.core.AbstractVerticle;
+import io.vertx.ext.web.Router;
+import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.handler.BodyHandler;
+
+public class SimpleREST extends AbstractVerticle {
+  @Override
+  public void start() {
+    Router router = Router.router(vertx);
+    router.route().handler(BodyHandler.create());
+    router.get("/products/:productID").handler(this::handleGetProduct);
+    router.put("/products/:productID").handler(this::handleAddProduct);
+    router.get("/products").handler(this::handleListProducts);
+    vertx.createHttpServer().requestHandler(router).listen(8080);
+  }
+
+  private void handleGetProduct(RoutingContext routingContext) {}
+  private void handleAddProduct(RoutingContext routingContext) {}
+  private void handleListProducts(RoutingContext routingContext) {}
+}
+`;
+
+/**
  * https://github.com/piomin/sample-vertx-microservices —
  * account-vertx-service/.../AccountServer.java
  */
@@ -2257,56 +2209,6 @@ public class AccountServer extends AbstractVerticle {
     router.get("/account").produces("application/json").handler(rc -> {});
     router.post("/account").produces("application/json").handler(rc -> {});
     router.delete("/account/:id").handler(rc -> {});
-/** https://github.com/jaspervz/todo-http4s-doobie — src/main/scala/service/TodoService.scala */
-export const HTTP4S_TODO_SERVICE = `
-package service
-
-import cats.effect.IO
-import org.http4s.dsl.Http4sDsl
-import org.http4s.{HttpRoutes, Uri}
-import repository.TodoRepository
-
-class TodoService(repository: TodoRepository) extends Http4sDsl[IO] {
-  val routes = HttpRoutes.of[IO] {
-    case GET -> Root / "todos" =>
-      Ok()
-
-    case GET -> Root / "todos" / LongVar(id) =>
-      Ok()
-
-    case req @ POST -> Root / "todos" =>
-      Created()
-
-    case req @ PUT -> Root / "todos" / LongVar(id) =>
-      Ok()
-
-    case DELETE -> Root / "todos" / LongVar(id) =>
-      NoContent()
-  }
-}
-`;
-
-/** https://github.com/metarank/metarank — src/main/scala/ai/metarank/api/routes/TrainApi.scala + HealthApi.scala */
-export const HTTP4S_METARANK_ROUTES = `
-package ai.metarank.api.routes
-
-import cats.effect.IO
-import org.http4s.dsl.io._
-import org.http4s.HttpRoutes
-
-case class TrainApi() {
-  def routes = HttpRoutes.of[IO] { case POST -> Root / "train" / modelName =>
-    Ok()
-  }
-}
-
-case class HealthApi() {
-  val routes = HttpRoutes.of[IO] { case GET -> Root / "health" => Ok() }
-}
-
-case class RankApi() {
-  val routes = HttpRoutes.of[IO] {
-    case post @ POST -> Root / "rank" / model :? ExplainParamDecoder(explain) => Ok()
   }
 }
 `;
@@ -2352,6 +2254,9 @@ public class HttpServerVerticle extends AbstractVerticle {
   private void apiCreatePage() {}
   private void apiUpdatePage() {}
   private void apiDeletePage() {}
+}
+`;
+
 /** https://github.com/tale/headplane — app/routes/util/healthz.ts */
 export const HEADPLANE_HEALTHZ_LOADER = `
 import { headscaleContext } from "~/server/context";
@@ -2448,6 +2353,32 @@ export async function action({ request }: Route.ActionArgs) {
   return redirect('/', {
     headers: { 'set-cookie': \`theme=\${theme}\` },
   })
+}
+`;
+
+/** https://github.com/sunecko/dotnet-fastendpoint-example — src/Example.Api/Endpoints/Auth/LoginEndpoint.cs */
+export const SUNECKO_LOGIN_ENDPOINT = `
+using FastEndpoints;
+
+namespace Example.Api.Endpoints.Auth;
+
+public class LoginEndpoint: Endpoint<LoginCommand, TokenResponse>
+{
+    public override void Configure()
+    {
+        Post("/auth/login");
+        AllowAnonymous();
+        Summary(x => x.Summary = "Get auth token");
+    }
+
+    public override async Task HandleAsync(LoginCommand req, CancellationToken ct)
+    {
+        var response = await req.ExecuteAsync(ct);
+        await SendAsync(response, statusCode: StatusCodes.Status200OK);
+    }
+}
+`;
+
 /** https://github.com/sunecko/dotnet-fastendpoint-example — src/Example.Api/Endpoints/Product/GetProductEndpoint.cs */
 export const SUNECKO_GET_PRODUCT_ENDPOINT = `
 using FastEndpoints;
@@ -2559,6 +2490,8 @@ public class SaveUserEndpoint : Endpoint<UserRequest>
 
     public override async Task HandleAsync(UserRequest req, CancellationToken ct) { }
 }
+`;
+
 /** https://github.com/michaelphillips4/notes-api — src/note.ts */
 export const ELYSIA_NOTES_API = `
 import { Elysia, t } from "elysia";
@@ -2671,6 +2604,62 @@ export const AuthController = new Elysia().group('/auth', (app) =>
     }),
 );
 `;
+
+/** https://github.com/jaspervz/todo-http4s-doobie — src/main/scala/service/TodoService.scala */
+export const HTTP4S_TODO_SERVICE = `
+package service
+
+import cats.effect.IO
+import org.http4s.dsl.Http4sDsl
+import org.http4s.{HttpRoutes, Uri}
+import repository.TodoRepository
+
+class TodoService(repository: TodoRepository) extends Http4sDsl[IO] {
+  val routes = HttpRoutes.of[IO] {
+    case GET -> Root / "todos" =>
+      Ok()
+
+    case GET -> Root / "todos" / LongVar(id) =>
+      Ok()
+
+    case req @ POST -> Root / "todos" =>
+      Created()
+
+    case req @ PUT -> Root / "todos" / LongVar(id) =>
+      Ok()
+
+    case DELETE -> Root / "todos" / LongVar(id) =>
+      NoContent()
+  }
+}
+`;
+
+/** https://github.com/metarank/metarank — src/main/scala/ai/metarank/api/routes/TrainApi.scala + HealthApi.scala */
+export const HTTP4S_METARANK_ROUTES = `
+package ai.metarank.api.routes
+
+import cats.effect.IO
+import org.http4s.dsl.io._
+import org.http4s.HttpRoutes
+
+case class TrainApi() {
+  def routes = HttpRoutes.of[IO] { case POST -> Root / "train" / modelName =>
+    Ok()
+  }
+}
+
+case class HealthApi() {
+  val routes = HttpRoutes.of[IO] { case GET -> Root / "health" => Ok() }
+}
+
+case class RankApi() {
+  val routes = HttpRoutes.of[IO] {
+    case post @ POST -> Root / "rank" / model :? ExplainParamDecoder(explain) => Ok()
+  }
+}
+`;
+
+/**
  * https://github.com/pauljamescleary/scala-pet-store —
  * src/main/scala/io/github/pauljamescleary/petstore/infrastructure/endpoint/PetEndpoints.scala
  * (AuthEndpoint partials + asAuthed; path vars + query matchers)
@@ -2702,6 +2691,8 @@ class PetEndpoints[F[_]] extends Http4sDsl[F] {
       Ok()
   }
 }
+`;
+
 /**
  * https://github.com/Introduction-to-Tornado/Introduction-to-Tornado
  * — simple_web_services/string_service.py
@@ -2809,6 +2800,99 @@ app = Application([
     url(r"/", MainHandler),
     url(r"/story/([0-9]+)", StoryHandler, dict(db=None), name="story"),
 ])
+`;
+
+/** https://github.com/akka/akka-http — samples/akka-http-quickstart-scala/src/main/scala/com/example/UserRoutes.scala */
+export const AKKA_HTTP_USER_ROUTES = `
+package com.example
+
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.Route
+import com.example.UserRegistry._
+import akka.actor.typed.ActorRef
+import akka.actor.typed.ActorSystem
+
+class UserRoutes(userRegistry: ActorRef[UserRegistry.Command])(implicit val system: ActorSystem[_]) {
+  def getUsers(): Future[Users] = userRegistry.ask(GetUsers.apply)
+  def getUser(name: String): Future[GetUserResponse] = userRegistry.ask(GetUser(name, _))
+  def createUser(user: User): Future[ActionPerformed] = userRegistry.ask(CreateUser(user, _))
+  def deleteUser(name: String): Future[ActionPerformed] = userRegistry.ask(DeleteUser(name, _))
+
+  val userRoutes: Route =
+    pathPrefix("users") {
+      concat(
+        pathEnd {
+          concat(
+            get {
+              complete(getUsers())
+            },
+            post {
+              entity(as[User]) { user =>
+                onSuccess(createUser(user)) { performed =>
+                  complete((StatusCodes.Created, performed))
+                }
+              }
+            })
+        },
+        path(Segment) { name =>
+          concat(
+            get {
+              rejectEmptyResponse {
+                onSuccess(getUser(name)) { response =>
+                  complete(response.maybeUser)
+                }
+              }
+            },
+            delete {
+              onSuccess(deleteUser(name)) { performed =>
+                complete((StatusCodes.OK, performed))
+              }
+            })
+        })
+    }
+}
+`;
+
+/** https://github.com/arhelmus/akka-http-rest — src/main/scala/me/archdev/restapi/http/routes/AuthRoute.scala */
+export const AKKA_HTTP_AUTH_ROUTE = `
+package me.archdev.restapi.http.routes
+
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.Directives._
+import me.archdev.restapi.core.auth.AuthService
+
+import scala.concurrent.ExecutionContext
+
+class AuthRoute(authService: AuthService)(implicit executionContext: ExecutionContext) {
+  import StatusCodes._
+  import authService._
+
+  val route = pathPrefix("auth") {
+    path("signIn") {
+      pathEndOrSingleSlash {
+        post {
+          entity(as[LoginPassword]) { loginPassword =>
+            complete(
+              signIn(loginPassword.login, loginPassword.password).map {
+                case Some(token) => OK         -> token.asJson
+                case None        => BadRequest -> None.asJson
+              }
+            )
+          }
+        }
+      }
+    } ~
+    path("signUp") {
+      pathEndOrSingleSlash {
+        post {
+          entity(as[UsernamePasswordEmail]) { userEntity =>
+            complete(Created -> signUp(userEntity.username, userEntity.email, userEntity.password))
+          }
+        }
+      }
+    }
+  }
 
   private case class LoginPassword(login: String, password: String)
   private case class UsernamePasswordEmail(username: String, email: String, password: String)
@@ -2891,6 +2975,8 @@ trait Service {
     }
   }
 }
+`;
+
 /** https://github.com/the-benchmarker/web-frameworks — python/pyramid/server.py */
 export const PYRAMID_BENCHMARKER_SERVER = `
 from pyramid.config import Configurator
@@ -2986,6 +3072,8 @@ if __name__ == '__main__':
         config.add_route('weather', 'weather/{location_name}')
         config.scan(".")
         app = config.make_wsgi_app()
+`;
+
 /** https://github.com/edsonlead/bottle_crud — project/controllers/controller.py */
 export const BOTTLE_CRUD_CONTROLLER = `
 import traceback
@@ -3124,3 +3212,4 @@ app.route('/ping', callback=ping_handler)
 def ping_handler():
     return "pong"
 `;
+
