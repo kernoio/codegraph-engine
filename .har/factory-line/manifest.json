@@ -31,7 +31,8 @@
     "fastendpoints-auth",
     "elysia-notes",
     "http4s-todo",
-    "tornado-string-service"
+    "tornado-string-service",
+    "akka-http-users"
   ],
   "repos": [
     {
@@ -201,6 +202,14 @@
       "minRoutes": 2,
       "optional": true,
       "note": "Tornado Application handlers \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "akka-http-microservice",
+      "url": "https://github.com/theiterators/akka-http-microservice.git",
+      "shallow": true,
+      "minRoutes": 2,
+      "optional": true,
+      "note": "Akka HTTP microservice sample \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

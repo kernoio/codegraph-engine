@@ -72,6 +72,9 @@ import http4sPlugin, { http4sResolver } from './http4s';
 import tornadoPlugin, { tornadoResolver } from './tornado';
 
 
+import akkaHttpPlugin, { akkaHttpResolver } from './akka-http';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -98,6 +101,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   elysiaPlugin,
   http4sPlugin,
   tornadoPlugin,
+  akkaHttpPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -134,4 +138,5 @@ export {
   elysiaResolver,
   http4sResolver,
   tornadoResolver,
+  akkaHttpResolver,
 };

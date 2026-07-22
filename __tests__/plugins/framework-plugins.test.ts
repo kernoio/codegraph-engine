@@ -42,6 +42,7 @@ import {
 import { parseRoutesConfig, resolveRouteModulePath } from '../../src/plugins/remix/routes-config';
 import { reactResolver } from '../../src/resolution/frameworks/react';
 import { getBuiltInPlugins, getBuiltInPluginResolvers } from '../../src/plugins';
+import { akkaHttpResolver } from '../../src/plugins/akka-http/resolver';
 import {
   LIGHTHASH_SSH_CONTROLLER,
   TSOA_OFFICIAL_GET_CONTROLLER,
@@ -144,6 +145,7 @@ import {
   TORNADO_WEBSSH_MAIN,
   TORNADO_YOUNG_USER_URLMAP,
   TORNADO_URL_HELPER,
+  AKKA_HTTP_USER_ROUTES,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -155,6 +157,7 @@ describe('in-repo plugin registry', () => {
       'kerno-adonisjs',
       'kerno-fastendpoints',
       'kerno-elysia',
+      'kerno-akka-http',
       'kerno-go-http',
       'kerno-hono',
       'kerno-ktor',
@@ -182,6 +185,7 @@ describe('in-repo plugin registry', () => {
       'adonisjs',
       'fastendpoints',
       'elysia',
+      'akka-http',
       'go',
       'hono',
       'ktor',
@@ -2462,5 +2466,17 @@ val routes = HttpRoutes.of[IO] {
       getAllFiles: () => ['requirements.txt', 'app.py'],
     };
     expect(tornadoResolver.detect!(negative as any)).toBe(false);
+describe('akka-http plugin (framework: Akka HTTP / Pekko HTTP)', () => {
+  it('extracts akka-http quickstart UserRoutes', () => {
+    const result = akkaHttpResolver.extract!(
+      'src/main/scala/com/example/UserRoutes.scala',
+      AKKA_HTTP_USER_ROUTES
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /users/{name}',
+      'GET /users',
+      'GET /users/{name}',
+      'POST /users',
+    ]);
   });
 });
