@@ -1624,4 +1624,113 @@ admin.add_routes([web.view("/stats", StatsView)])
 
 app = web.Application()
 app.add_subapp("/admin/", admin)
+/** https://github.com/howie6879/owllook — owllook/views/api_blueprint.py (trimmed) */
+export const OWLLOOK_API_BLUEPRINT = `
+from sanic import Blueprint
+
+api_bp = Blueprint('api_blueprint', url_prefix='api')
+
+
+@api_bp.route("/owl_bd_novels/<name>")
+@authenticator('Owllook-Api-Key')
+async def owl_bd_novels(request, name):
+    return None
+
+
+@api_bp.route("/owl_novels_chapters", methods=['POST'])
+@auth_params('chapters_url', 'novels_name')
+@authenticator('Owllook-Api-Key')
+async def owl_novels_chapters(request, **kwargs):
+    return None
+
+
+@api_bp.route("/owl_so_novels/<name>")
+@authenticator('Owllook-Api-Key')
+async def owl_so_novels(request, name):
+    return None
+`;
+
+/** https://github.com/sanic-org/sanic — examples/blueprints.py (trimmed) */
+export const SANIC_OFFICIAL_BLUEPRINTS = `
+from sanic import Blueprint, Sanic
+from sanic.response import json
+
+app = Sanic("Example")
+blueprint = Blueprint("bp_example", url_prefix="/my_blueprint")
+blueprint2 = Blueprint("bp_example2", url_prefix="/my_blueprint2")
+
+
+@blueprint.route("/foo")
+async def foo(request):
+    return json({"msg": "hi from blueprint"})
+
+
+@blueprint2.route("/foo")
+async def foo2(request):
+    return json({"msg": "hi from blueprint2"})
+
+
+app.blueprint(blueprint)
+app.blueprint(blueprint2)
+`;
+
+/** https://github.com/sanic-org/sanic — examples/hello_world.py */
+export const SANIC_HELLO_WORLD = `
+from sanic import Sanic, response
+
+app = Sanic("Example")
+
+
+@app.route("/")
+async def test(request):
+    return response.json({"test": True})
+`;
+
+/** https://github.com/ahopkins/sanic-jwt — example/on_blueprint.py (trimmed) */
+export const SANIC_JWT_ON_BLUEPRINT = `
+from sanic import Sanic
+from sanic.blueprints import Blueprint
+from sanic.response import json
+from sanic_jwt.decorators import protected
+
+blueprint = Blueprint("Test")
+
+
+@blueprint.get("/somewhere", strict_slashes=True)
+@protected(blueprint)
+def protected_hello_world(request):
+    return json({"message": "hello world"})
+
+
+@blueprint.get("/user/<id>", strict_slashes=True)
+@protected(blueprint)
+def protected_user(request, id):
+    return json({"user": id})
+
+
+app = Sanic(__name__)
+app.blueprint(blueprint, url_prefix="/test")
+`;
+
+/** https://github.com/ahopkins/sanic-jwt — example/cbv.py (trimmed) */
+export const SANIC_JWT_CBV = `
+from sanic import Sanic
+from sanic.response import json
+from sanic.views import HTTPMethodView
+
+app = Sanic()
+
+
+class PublicView(HTTPMethodView):
+    def get(self, request):
+        return json({"hello": "world"})
+
+
+class ProtectedView(HTTPMethodView):
+    async def get(self, request):
+        return json({"protected": True})
+
+
+app.add_route(PublicView.as_view(), "/")
+app.add_route(ProtectedView.as_view(), "/protected")
 `;

@@ -21,7 +21,8 @@
     "micronaut-kestra-misc",
     "koa-blog-users",
     "slim-skeleton-users",
-    "aiohttp-polls"
+    "aiohttp-polls",
+    "sanic-api"
   ],
   "repos": [
     {
@@ -111,6 +112,14 @@
       "minRoutes": 4,
       "optional": true,
       "note": "Official aiohttp demos \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "sanic",
+      "url": "https://github.com/sanic-org/sanic.git",
+      "shallow": true,
+      "minRoutes": 1,
+      "optional": true,
+      "note": "Sanic framework examples \u2014 enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

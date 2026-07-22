@@ -42,6 +42,9 @@ import slimPlugin, { slimResolver } from './slim';
 import aiohttpPlugin, { aiohttpResolver } from './aiohttp';
 
 
+import sanicPlugin, { sanicResolver } from './sanic';
+
+
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
   nextAppRouterPlugin,
@@ -58,6 +61,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   koaPlugin,
   slimPlugin,
   aiohttpPlugin,
+  sanicPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -84,4 +88,5 @@ export {
   koaResolver,
   slimResolver,
   aiohttpResolver,
+  sanicResolver,
 };
