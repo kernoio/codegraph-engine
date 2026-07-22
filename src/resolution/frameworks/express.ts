@@ -64,7 +64,7 @@ export const expressResolver: FrameworkResolver = {
         const pkg = JSON.parse(packageJson);
         const deps = { ...pkg.dependencies, ...pkg.devDependencies };
         // Fastify / Hapi / Adonis are owned by dedicated plugins.
-        if (deps.express || deps.koa) {
+        if (deps.express) {
           return true;
         }
       } catch {
@@ -84,7 +84,9 @@ export const expressResolver: FrameworkResolver = {
         if (
           content &&
           !isAdonisRouteSource(content) &&
-          (content.includes('express') || content.includes('app.get') || content.includes('router.get'))
+          (/from\s+['"]express['"]/.test(content) ||
+            /require\s*\(\s*['"]express['"]\s*\)/.test(content) ||
+            /\bexpress\s*\(/.test(content))
         ) {
           return true;
         }
