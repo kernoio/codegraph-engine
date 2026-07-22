@@ -9,7 +9,8 @@
     "next-posts",
     "next-endpoint-scope",
     "django-users",
-    "nestjs-novu-widgets"
+    "nestjs-novu-widgets",
+    "hapi-users"
   ],
   "repos": [
     {
@@ -19,6 +20,14 @@
       "minRoutes": 1,
       "optional": true,
       "note": "Stock Express resolver smoke — enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "hapi-clean-architecture",
+      "url": "https://github.com/jbuget/nodejs-clean-architecture-app.git",
+      "shallow": true,
+      "minRoutes": 6,
+      "optional": true,
+      "note": "Hapi server.route arrays + plugin register — enable with FACTORY_LINE_CLONE=1"
     }
   ]
 }

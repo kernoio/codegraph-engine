@@ -9,6 +9,8 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { hapiResolver } from '../../src/plugins/hapi/resolver';
+import { expressResolver } from '../../src/resolution/frameworks/express';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,6 +34,10 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  HAPI_CLEAN_ARCH_USERS,
+  HAPI_FRAME_LOGIN,
+  HAPI_SPARKJOKE_ROUTES,
+  HAPI_METHOD_ARRAY_AND_PREFIX,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -39,6 +45,7 @@ describe('in-repo plugin registry', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
       'kerno-go-http',
+      'kerno-hapi',
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
@@ -46,6 +53,7 @@ describe('in-repo plugin registry', () => {
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
       'go',
+      'hapi',
       'laravel',
       'nestjs',
       'next-app-router',
@@ -372,5 +380,152 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('hapi plugin (framework: Hapi)', () => {
+  it('detects @hapi/hapi dependency and ignores express-only projects', () => {
+    const positive = {
+      readFile: (fp: string) =>
+        fp === 'package.json'
+          ? JSON.stringify({ dependencies: { '@hapi/hapi': '^21.0.0' } })
+          : null,
+      getAllFiles: () => ['package.json'],
+      fileExists: () => true,
+      getProjectRoot: () => '/test',
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: () => [],
+      getNodesInFile: () => [],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    expect(hapiResolver.detect(positive as any)).toBe(true);
+
+    const negative = {
+      ...positive,
+      readFile: (fp: string) =>
+        fp === 'package.json' ? JSON.stringify({ dependencies: { express: '^4.0.0' } }) : null,
+    };
+    expect(hapiResolver.detect(negative as any)).toBe(false);
+  });
+
+  it('does not let Express claim @hapi/hapi projects', () => {
+    const ctx = {
+      readFile: (fp: string) =>
+        fp === 'package.json'
+          ? JSON.stringify({ dependencies: { '@hapi/hapi': '^21.0.0' } })
+          : null,
+      getAllFiles: () => ['package.json'],
+      fileExists: () => true,
+      getProjectRoot: () => '/test',
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: () => [],
+      getNodesInFile: () => [],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    expect(expressResolver.detect(ctx as any)).toBe(false);
+    expect(hapiResolver.detect(ctx as any)).toBe(true);
+  });
+
+  it('extracts jbuget clean-architecture users route array + controller refs', () => {
+    const result = hapiResolver.extract!(
+      'lib/interfaces/routes/users.js',
+      HAPI_CLEAN_ARCH_USERS
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /users/{id}',
+      'GET /users',
+      'GET /users/{id}',
+      'POST /users',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'UsersController.createUser',
+      'UsersController.deleteUser',
+      'UsersController.findUsers',
+      'UsersController.getUser',
+    ]);
+  });
+
+  it('extracts jedireza/frame login plugin routes', () => {
+    const result = hapiResolver.extract!('server/api/login.js', HAPI_FRAME_LOGIN);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'POST /api/login',
+      'POST /api/login/forgot',
+    ]);
+  });
+
+  it('extracts sparkjoke top-level server.route paths', () => {
+    const result = hapiResolver.extract!('api/routes.js', HAPI_SPARKJOKE_ROUTES);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /jokes/{jokeIdx}',
+      'GET /jokesUpperBound',
+      'GET /welcome',
+    ]);
+  });
+
+  it('extracts method arrays, catch-all *, and same-file register prefix', () => {
+    const result = hapiResolver.extract!('server.js', HAPI_METHOD_ARRAY_AND_PREFIX);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'ALL /{p*}',
+      'GET /api/health',
+      'POST /items',
+      'PUT /items',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'healthCheck',
+      'notFound',
+      'saveItem',
+      'saveItem',
+    ]);
+  });
+
+  it('applies cross-file register routes.prefix in postExtract', () => {
+    const route = {
+      id: 'route:lib/interfaces/routes/users.js:10:GET:/users',
+      kind: 'route' as const,
+      name: 'GET /users',
+      qualifiedName: 'lib/interfaces/routes/users.js::route:GET:/users',
+      filePath: 'lib/interfaces/routes/users.js',
+      language: 'javascript' as const,
+      startLine: 10,
+      endLine: 10,
+      startColumn: 0,
+      endColumn: 0,
+      updatedAt: 0,
+    };
+    const ctx = {
+      getNodesInFile: () => [route],
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: (kind: string) => (kind === 'route' ? [route] : []),
+      iterateNodesByKind: (kind: string) =>
+        kind === 'route' ? [route][Symbol.iterator]() : [][Symbol.iterator](),
+      fileExists: () => true,
+      readFile: (fp: string) => {
+        if (fp === 'lib/infrastructure/webserver/server.js') {
+          return `
+const Hapi = require('@hapi/hapi');
+const server = Hapi.server({ port: 3000 });
+await server.register(require('../../interfaces/routes/users'), {
+  routes: { prefix: '/api/v1' },
+});
+`;
+        }
+        return null;
+      },
+      getProjectRoot: () => '/test',
+      getAllFiles: () => [
+        'lib/infrastructure/webserver/server.js',
+        'lib/interfaces/routes/users.js',
+      ],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    const updates = hapiResolver.postExtract!(ctx as any);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.name).toBe('GET /api/v1/users');
   });
 });

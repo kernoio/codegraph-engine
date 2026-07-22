@@ -58,7 +58,9 @@ export const expressResolver: FrameworkResolver = {
       try {
         const pkg = JSON.parse(packageJson);
         const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-        if (deps.express || deps.fastify || deps.koa || deps.hapi) {
+        // Fastify / Hapi are owned by kerno-fastify / kerno-hapi plugins —
+        // do not claim them here (detected-but-silent is worse than not detecting).
+        if (deps.express || deps.koa) {
           return true;
         }
       } catch {
