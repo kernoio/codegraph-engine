@@ -16,6 +16,7 @@ import {
 } from '../../src/plugins/next-app-router/route-path';
 import { reactResolver } from '../../src/resolution/frameworks/react';
 import { getBuiltInPlugins, getBuiltInPluginResolvers } from '../../src/plugins';
+import { akkaHttpResolver } from '../../src/plugins/akka-http/resolver';
 import {
   LIGHTHASH_SSH_CONTROLLER,
   TSOA_OFFICIAL_GET_CONTROLLER,
@@ -32,12 +33,14 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  AKKA_HTTP_USER_ROUTES,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
   it('exposes all Kerno built-in framework plugins', () => {
     const ids = getBuiltInPlugins().map((p) => p.id).sort();
     expect(ids).toEqual([
+      'kerno-akka-http',
       'kerno-go-http',
       'kerno-nestjs',
       'kerno-next-app-router',
@@ -45,6 +48,7 @@ describe('in-repo plugin registry', () => {
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
+      'akka-http',
       'go',
       'laravel',
       'nestjs',
@@ -372,5 +376,20 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('akka-http plugin (framework: Akka HTTP / Pekko HTTP)', () => {
+  it('extracts akka-http quickstart UserRoutes', () => {
+    const result = akkaHttpResolver.extract!(
+      'src/main/scala/com/example/UserRoutes.scala',
+      AKKA_HTTP_USER_ROUTES
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /users/{name}',
+      'GET /users',
+      'GET /users/{name}',
+      'POST /users',
+    ]);
   });
 });

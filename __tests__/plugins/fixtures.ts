@@ -262,3 +262,178 @@ Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers
 Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
 Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
+
+/** https://github.com/akka/akka-http — samples/akka-http-quickstart-scala/src/main/scala/com/example/UserRoutes.scala */
+export const AKKA_HTTP_USER_ROUTES = `
+package com.example
+
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.Route
+import com.example.UserRegistry._
+import akka.actor.typed.ActorRef
+import akka.actor.typed.ActorSystem
+
+class UserRoutes(userRegistry: ActorRef[UserRegistry.Command])(implicit val system: ActorSystem[_]) {
+  def getUsers(): Future[Users] = userRegistry.ask(GetUsers.apply)
+  def getUser(name: String): Future[GetUserResponse] = userRegistry.ask(GetUser(name, _))
+  def createUser(user: User): Future[ActionPerformed] = userRegistry.ask(CreateUser(user, _))
+  def deleteUser(name: String): Future[ActionPerformed] = userRegistry.ask(DeleteUser(name, _))
+
+  val userRoutes: Route =
+    pathPrefix("users") {
+      concat(
+        pathEnd {
+          concat(
+            get {
+              complete(getUsers())
+            },
+            post {
+              entity(as[User]) { user =>
+                onSuccess(createUser(user)) { performed =>
+                  complete((StatusCodes.Created, performed))
+                }
+              }
+            })
+        },
+        path(Segment) { name =>
+          concat(
+            get {
+              rejectEmptyResponse {
+                onSuccess(getUser(name)) { response =>
+                  complete(response.maybeUser)
+                }
+              }
+            },
+            delete {
+              onSuccess(deleteUser(name)) { performed =>
+                complete((StatusCodes.OK, performed))
+              }
+            })
+        })
+    }
+}
+`;
+
+/** https://github.com/arhelmus/akka-http-rest — src/main/scala/me/archdev/restapi/http/routes/AuthRoute.scala */
+export const AKKA_HTTP_AUTH_ROUTE = `
+package me.archdev.restapi.http.routes
+
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.Directives._
+import me.archdev.restapi.core.auth.AuthService
+
+import scala.concurrent.ExecutionContext
+
+class AuthRoute(authService: AuthService)(implicit executionContext: ExecutionContext) {
+  import StatusCodes._
+  import authService._
+
+  val route = pathPrefix("auth") {
+    path("signIn") {
+      pathEndOrSingleSlash {
+        post {
+          entity(as[LoginPassword]) { loginPassword =>
+            complete(
+              signIn(loginPassword.login, loginPassword.password).map {
+                case Some(token) => OK         -> token.asJson
+                case None        => BadRequest -> None.asJson
+              }
+            )
+          }
+        }
+      }
+    } ~
+    path("signUp") {
+      pathEndOrSingleSlash {
+        post {
+          entity(as[UsernamePasswordEmail]) { userEntity =>
+            complete(Created -> signUp(userEntity.username, userEntity.email, userEntity.password))
+          }
+        }
+      }
+    }
+  }
+
+  private case class LoginPassword(login: String, password: String)
+  private case class UsernamePasswordEmail(username: String, email: String, password: String)
+}
+`;
+
+/** https://github.com/codegik/pocs — scala3-pekko/src/main/scala/Routes.scala */
+export const PEKKO_HTTP_ROUTES = `
+import org.apache.pekko.actor.typed.{ActorRef, ActorSystem}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.Route
+
+class Routes(userActor: ActorRef[UserActor.Command])(using system: ActorSystem[?]):
+  val routes: Route =
+    concat(
+      path("health") {
+        get {
+          complete(HttpEntity(ContentTypes.\`application/json\`, """{"status":"ok"}"""))
+        }
+      },
+      pathPrefix("users") {
+        concat(
+          pathEnd {
+            post {
+              parameter("name") { name =>
+                val response = userActor.ask(ref => UserActor.CreateUser(name, ref))
+                onSuccess(response) {
+                  case UserActor.UserCreated(id) =>
+                    complete(StatusCodes.Created, HttpEntity(ContentTypes.\`application/json\`, s"""{"id":"$id"}"""))
+                }
+              }
+            }
+          },
+          path(Segment) { id =>
+            get {
+              val response = userActor.ask(ref => UserActor.GetUser(id, ref))
+              onSuccess(response) {
+                case UserActor.UserInfo(userId, name) =>
+                  complete(HttpEntity(ContentTypes.\`application/json\`, s"""{"id":"$userId","name":"$name"}"""))
+                case UserActor.NotFound(_) =>
+                  complete(StatusCodes.NotFound)
+              }
+            }
+          }
+        )
+      }
+    )
+`;
+
+/** https://github.com/theiterators/akka-http-microservice — src/main/scala/AkkaHttpMicroservice.scala (routes only) */
+export const AKKA_HTTP_MICROSERVICE_ROUTES = `
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+
+trait Service {
+  val routes: Route = {
+    logRequestResult("akka-http-microservice") {
+      pathPrefix("ip") {
+        (get & path(Segment)) { ip =>
+          complete {
+            fetchIpInfo(ip).map[ToResponseMarshallable] {
+              case ipInfo: IpInfo => ipInfo
+              case errorMessage: String => BadRequest -> errorMessage
+            }
+          }
+        } ~
+        (post & entity(as[IpPairSummaryRequest])) { ipPairSummaryRequest =>
+          complete {
+            val ip1InfoFuture = fetchIpInfo(ipPairSummaryRequest.ip1)
+            val ip2InfoFuture = fetchIpInfo(ipPairSummaryRequest.ip2)
+            ip1InfoFuture.zip(ip2InfoFuture).map[ToResponseMarshallable] {
+              case (info1: IpInfo, info2: IpInfo) => IpPairSummary(info1, info2)
+              case (errorMessage: String, _) => BadRequest -> errorMessage
+              case (_, errorMessage: String) => BadRequest -> errorMessage
+            }
+          }
+        }
+      }
+    }
+  }
+}
+`;
