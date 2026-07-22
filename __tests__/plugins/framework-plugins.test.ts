@@ -9,6 +9,7 @@ import { tsoaResolver } from '../../src/plugins/tsoa/resolver';
 import { nextAppRouterResolver } from '../../src/plugins/next-app-router/resolver';
 import { nestjsKernoResolver } from '../../src/plugins/nestjs-kerno/resolver';
 import { phpHttpRoutesResolver } from '../../src/plugins/php-http-routes/resolver';
+import { symfonyResolver } from '../../src/plugins/symfony/resolver';
 import {
   isNextHttpRouteHandler,
   isNextPageRoute,
@@ -32,6 +33,10 @@ import {
   APPWRITE_LOCALE_ROUTES,
   APPWRITE_PLATFORM_VCS_CREATE,
   FIREFLY_PASSPORT_ROUTES,
+  SYMFONY_DEMO_BLOG_CONTROLLER,
+  SYMFONY_DEMO_BLOG_ANNOTATIONS,
+  SYMFONY_SYLIUS_CART_YAML,
+  SYMFONY_DOCS_ROUTES_XML,
 } from './fixtures';
 
 describe('in-repo plugin registry', () => {
@@ -42,6 +47,7 @@ describe('in-repo plugin registry', () => {
       'kerno-nestjs',
       'kerno-next-app-router',
       'kerno-php-http-routes',
+      'kerno-symfony',
       'kerno-tsoa',
     ]);
     expect(getBuiltInPluginResolvers().map((r) => r.name).sort()).toEqual([
@@ -49,6 +55,7 @@ describe('in-repo plugin registry', () => {
       'laravel',
       'nestjs',
       'next-app-router',
+      'symfony',
       'tsoa',
     ]);
   });
@@ -372,5 +379,109 @@ Route::resource('users', UserController::class);
     expect(result.nodes.map((n) => n.name)).toContain('GET /users');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@index');
     expect(result.references.map((r) => r.referenceName)).toContain('UserController@store');
+  });
+});
+
+describe('symfony plugin (framework: Symfony)', () => {
+  it('extracts symfony/demo BlogController #[Route] attributes with class prefix', () => {
+    const result = symfonyResolver.extract!(
+      'src/Controller/BlogController.php',
+      SYMFONY_DEMO_BLOG_CONTROLLER
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /blog',
+      'GET /blog/page/{page}',
+      'GET /blog/posts/{slug}',
+      'GET /blog/rss.xml',
+      'GET /blog/search',
+      'POST /blog/comment/{postSlug}/new',
+    ]);
+    expect(result.references.map((r) => r.referenceName)).toContain('BlogController::index');
+    expect(result.references.map((r) => r.referenceName)).toContain('BlogController::postShow');
+  });
+
+  it('extracts legacy @Route annotations with class prefix', () => {
+    const result = symfonyResolver.extract!(
+      'src/Controller/BlogController.php',
+      SYMFONY_DEMO_BLOG_ANNOTATIONS
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /blog',
+      'GET /blog/page/{page}',
+      'GET /blog/posts/{slug}',
+      'GET /blog/rss.xml',
+      'POST /blog/comment/{postSlug}/new',
+    ]);
+  });
+
+  it('extracts Sylius YAML cart routes and skips resource imports', () => {
+    const result = symfonyResolver.extract!(
+      'Resources/config/routing/cart.yml',
+      SYMFONY_SYLIUS_CART_YAML
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /',
+      'PATCH /checkout',
+    ]);
+    expect(result.references.map((r) => r.referenceName)).toContain(
+      'sylius.controller.order::summaryAction'
+    );
+  });
+
+  it('does not treat monolog package YAML path keys as routes', () => {
+    const monolog = `
+monolog:
+    handlers:
+        nested:
+            type: stream
+            path: php://stderr
+            level: debug
+`;
+    const result = symfonyResolver.extract!('config/packages/monolog.yaml', monolog);
+    expect(result.nodes).toEqual([]);
+  });
+
+  it('extracts XML route tables from Symfony docs shape', () => {
+    const result = symfonyResolver.extract!('config/routes.xml', SYMFONY_DOCS_ROUTES_XML);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /blog',
+      'GET /blog/{slug}',
+      'HEAD /blog/{slug}',
+    ]);
+  });
+
+  it('detects Symfony via framework-bundle and rejects Laravel-only composer', () => {
+    const symfonyCtx = {
+      readFile: (f: string) =>
+        f === 'composer.json'
+          ? JSON.stringify({ require: { 'symfony/framework-bundle': '^7.0' } })
+          : null,
+      fileExists: () => false,
+      getAllFiles: () => [] as string[],
+      getNodesByName: () => [],
+      getNodesInFile: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: () => [],
+      iterateNodesByKind: () => [][Symbol.iterator](),
+      getProjectRoot: () => '/tmp',
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    };
+    expect(symfonyResolver.detect(symfonyCtx as any)).toBe(true);
+
+    const laravelCtx = {
+      ...symfonyCtx,
+      readFile: (f: string) =>
+        f === 'composer.json'
+          ? JSON.stringify({
+              require: {
+                'laravel/framework': '^11.0',
+                'symfony/routing': '^7.0',
+                'symfony/http-foundation': '^7.0',
+              },
+            })
+          : null,
+    };
+    expect(symfonyResolver.detect(laravelCtx as any)).toBe(false);
   });
 });

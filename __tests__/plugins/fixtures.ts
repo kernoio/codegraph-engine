@@ -262,3 +262,130 @@ Route::post('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers
 Route::get('/personal-access-tokens', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@listPersonalAccessTokens', 'as' => 'personal.tokens.index']);
 Route::delete('/personal-access-tokens/{token_id}', ['uses' => 'FireflyIII\\Http\\Controllers\\Profile\\OAuthController@destroyPersonalAccessToken', 'as' => 'personal.tokens.destroy']);
 `;
+
+/**
+ * https://github.com/symfony/demo — src/Controller/BlogController.php
+ * (trimmed; PHP 8 attributes + class-level prefix)
+ */
+export const SYMFONY_DEMO_BLOG_CONTROLLER = `
+<?php
+namespace App\\Controller;
+
+use Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController;
+use Symfony\\Component\\HttpFoundation\\Response;
+use Symfony\\Component\\Routing\\Attribute\\Route;
+use Symfony\\Component\\Routing\\Requirement\\Requirement;
+
+#[Route('/blog')]
+final class BlogController extends AbstractController
+{
+    #[Route('/', name: 'blog_index', defaults: ['page' => '1', '_format' => 'html'], methods: ['GET'])]
+    #[Route('/rss.xml', name: 'blog_rss', defaults: ['page' => '1', '_format' => 'xml'], methods: ['GET'])]
+    #[Route('/page/{page}', name: 'blog_index_paginated', defaults: ['_format' => 'html'], requirements: ['page' => Requirement::POSITIVE_INT], methods: ['GET'])]
+    public function index(): Response
+    {
+        return new Response();
+    }
+
+    #[Route('/posts/{slug:post}', name: 'blog_post', requirements: ['slug' => Requirement::ASCII_SLUG], methods: ['GET'])]
+    public function postShow(): Response
+    {
+        return new Response();
+    }
+
+    #[Route('/comment/{postSlug}/new', name: 'comment_new', methods: ['POST'])]
+    public function commentNew(): Response
+    {
+        return new Response();
+    }
+
+    #[Route('/search', name: 'blog_search', methods: ['GET'])]
+    public function search(): Response
+    {
+        return new Response();
+    }
+}
+`;
+
+/**
+ * https://github.com/symfony/demo (v1.6.3) — src/Controller/BlogController.php
+ * Legacy Sensio/Annotation \`@Route\` docblock form.
+ */
+export const SYMFONY_DEMO_BLOG_ANNOTATIONS = `
+<?php
+namespace App\\Controller;
+
+use Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController;
+use Symfony\\Component\\HttpFoundation\\Response;
+use Symfony\\Component\\Routing\\Annotation\\Route;
+
+/**
+ * @Route("/blog")
+ */
+class BlogController extends AbstractController
+{
+    /**
+     * @Route("/", defaults={"page": "1", "_format"="html"}, methods="GET", name="blog_index")
+     * @Route("/rss.xml", defaults={"page": "1", "_format"="xml"}, methods="GET", name="blog_rss")
+     * @Route("/page/{page<[1-9]\\\\d*>}", defaults={"_format"="html"}, methods="GET", name="blog_index_paginated")
+     */
+    public function index(): Response
+    {
+        return new Response();
+    }
+
+    /**
+     * @Route("/posts/{slug}", methods="GET", name="blog_post")
+     */
+    public function postShow(): Response
+    {
+        return new Response();
+    }
+
+    /**
+     * @Route("/comment/{postSlug}/new", methods="POST", name="comment_new")
+     */
+    public function commentNew(): Response
+    {
+        return new Response();
+    }
+}
+`;
+
+/**
+ * https://github.com/Sylius/Sylius — src/Sylius/Bundle/ShopBundle/Resources/config/routing/cart.yml
+ * (concrete YAML routes with methods + _controller)
+ */
+export const SYMFONY_SYLIUS_CART_YAML = `
+sylius_shop_cart_summary:
+    path: /
+    methods: [GET]
+    defaults:
+        _controller: sylius.controller.order::summaryAction
+
+sylius_shop_cart_checkout:
+    path: /checkout
+    methods: [PATCH]
+    defaults:
+        _controller: sylius.controller.order::saveAction
+
+# Import-only entry — must not invent a route path
+sylius_shop_cart_ajax:
+    resource: "@SyliusShopBundle/Resources/config/routing/cart_ajax.yml"
+    prefix: /ajax
+`;
+
+/**
+ * Symfony docs — XML route table (still present in older apps; deprecated in 7.4+)
+ * https://symfony.com/doc/7.4/routing.html
+ */
+export const SYMFONY_DOCS_ROUTES_XML = `
+<?xml version="1.0" encoding="UTF-8" ?>
+<routes xmlns="http://symfony.com/schema/routing"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://symfony.com/schema/routing
+            https://symfony.com/schema/routing/routing-1.0.xsd">
+    <route id="blog_list" path="/blog" controller="App\\Controller\\BlogController::list" methods="GET"/>
+    <route id="blog_show" path="/blog/{slug}" controller="App\\Controller\\BlogController::show" methods="GET|HEAD"/>
+</routes>
+`;
