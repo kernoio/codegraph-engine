@@ -82,3 +82,6 @@ ecosystem.agent.*.config.cjs
 .har/runs/
 .har/slots/
 .har/state/
+
+# linux-arm64 kernel cross-build cache (rust:1-bookworm builder)
+target-linux/
