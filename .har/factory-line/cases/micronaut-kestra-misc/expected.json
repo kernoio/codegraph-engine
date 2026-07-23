@@ -1,0 +1,12 @@
+{
+  "framework": "micronaut",
+  "source": "https://github.com/kestra-io/kestra — webserver/.../MiscController.java (trimmed)",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /api/v1/configs",
+    "GET /api/v1/configs/login",
+    "GET /api/v1/{tenant}/usages/all",
+    "POST /api/v1/login",
+    "POST /api/v1/{tenant}/basicAuth"
+  ]
+}

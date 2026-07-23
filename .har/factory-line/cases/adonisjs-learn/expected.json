@@ -1,0 +1,24 @@
+{
+  "framework": "adonisjs",
+  "source": "https://github.com/adocasts/lets-learn-adonisjs-6 — start/routes.ts",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /admin/movies/{id}",
+    "GET /",
+    "GET /admin",
+    "GET /admin/movies",
+    "GET /admin/movies/create",
+    "GET /admin/movies/{id}",
+    "GET /admin/movies/{id}/edit",
+    "GET /auth/login",
+    "GET /auth/register",
+    "GET /movies",
+    "GET /movies/{slug}",
+    "PATCH /admin/movies/{id}",
+    "POST /admin/movies",
+    "POST /auth/login",
+    "POST /auth/logout",
+    "POST /auth/register",
+    "PUT /admin/movies/{id}"
+  ]
+}

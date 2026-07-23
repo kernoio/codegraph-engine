@@ -168,4 +168,5 @@ export {
   nestjsKernoResolver,
   goHttpResolver,
   phpHttpRoutesResolver,
+  hapiResolver,
 } from '../../plugins';

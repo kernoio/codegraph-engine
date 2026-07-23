@@ -17,8 +17,14 @@ import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '../..');
-const ARTIFACTS = process.env.FACTORY_LINE_ARTIFACTS || path.join(__dirname, '../artifacts/factory-line');
+// Prefer an explicit override (set by stages/factory-line.sh for worktree slots),
+// then cwd when it looks like the repo root, else the tree that owns this script.
+const REPO_ROOT =
+  process.env.FACTORY_LINE_REPO_ROOT ||
+  (fs.existsSync(path.join(process.cwd(), '.har/factory-line/manifest.json'))
+    ? process.cwd()
+    : path.resolve(__dirname, '../..'));
+const ARTIFACTS = process.env.FACTORY_LINE_ARTIFACTS || path.join(REPO_ROOT, '.har/artifacts/factory-line');
 const CORPUS = process.env.FACTORY_LINE_CORPUS || path.join(ARTIFACTS, 'repos');
 
 const args = new Set(process.argv.slice(2));

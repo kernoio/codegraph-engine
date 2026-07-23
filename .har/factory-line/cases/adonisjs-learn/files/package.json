@@ -1,0 +1,6 @@
+{
+  "name": "adonisjs-learn-fixture",
+  "dependencies": {
+    "@adonisjs/core": "^6.0.0"
+  }
+}

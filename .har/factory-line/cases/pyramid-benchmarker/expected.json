@@ -1,0 +1,9 @@
+{
+  "framework": "pyramid",
+  "source": "https://github.com/the-benchmarker/web-frameworks — python/pyramid/server.py",
+  "routes": [
+    "ANY /",
+    "ANY /user/{id}",
+    "POST /user"
+  ]
+}

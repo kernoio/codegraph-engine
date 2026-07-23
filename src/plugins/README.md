@@ -48,3 +48,11 @@ double-counted with their module implementations.
 
 Endpoint / aicore consumers should filter with `isNextHttpRouteHandler()` from
 `src/plugins/next-app-router/route-path.ts` rather than counting all route nodes.
+
+## Remix / React Router framework mode
+
+`kerno-remix` indexes framework-mode HTTP handlers (`loader` → `GET`, `action` →
+`POST` / method-switch verbs) from `app/routes/**` file conventions and rewrites
+paths from `app/routes.ts` (`route` / `index` / `prefix` / `layout`). Declarative
+`<Route>` / `createBrowserRouter` data-router apps stay on the stock `react`
+resolver.

@@ -1,0 +1,6 @@
+{
+  "framework": "fastendpoints",
+  "source": "https://github.com/sunecko/dotnet-fastendpoint-example — src/Example.Api/Endpoints/Auth/LoginEndpoint.cs",
+  "endpointScope": "http-handler",
+  "routes": ["POST /auth/login"]
+}

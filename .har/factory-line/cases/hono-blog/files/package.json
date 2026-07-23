@@ -1,0 +1,6 @@
+{
+  "name": "hono-blog-fixture",
+  "dependencies": {
+    "hono": "^4.0.0"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "framework": "tornado",
+  "source": "Introduction-to-Tornado/Introduction-to-Tornado — simple_web_services/string_service.py",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /reverse/{param}",
+    "POST /wrap"
+  ]
+}

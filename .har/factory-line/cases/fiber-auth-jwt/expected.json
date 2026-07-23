@@ -1,0 +1,19 @@
+{
+  "framework": "fiber",
+  "source": "gofiber/recipes — auth-jwt/router/router.go",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /api/products/{id}",
+    "DELETE /api/users/{id}",
+    "GET /api",
+    "GET /api/products",
+    "GET /api/products/{id}",
+    "GET /api/users/{id}",
+    "PATCH /api/users/{id}",
+    "POST /api/auth/login",
+    "POST /api/auth/logout",
+    "POST /api/auth/refresh-token",
+    "POST /api/auth/register",
+    "POST /api/products"
+  ]
+}

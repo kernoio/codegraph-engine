@@ -1,0 +1,11 @@
+{
+  "framework": "akka-http",
+  "source": "akka/akka-http — samples/akka-http-quickstart-scala/src/main/scala/com/example/UserRoutes.scala",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /users/{name}",
+    "GET /users",
+    "GET /users/{name}",
+    "POST /users"
+  ]
+}

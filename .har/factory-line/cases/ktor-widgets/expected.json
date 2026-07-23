@@ -1,0 +1,12 @@
+{
+  "framework": "ktor",
+  "source": "https://github.com/raharrison/kotlin-ktor-exposed-starter — src/main/kotlin/web/WidgetResource.kt",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /widgets/{id}",
+    "GET /widgets",
+    "GET /widgets/{id}",
+    "POST /widgets",
+    "PUT /widgets"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "framework": "symfony",
+  "source": "https://github.com/symfony/demo — src/Controller/BlogController.php (+ YAML homepage)",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /",
+    "GET /blog",
+    "GET /blog/page/{page}",
+    "GET /blog/posts/{slug}",
+    "GET /blog/rss.xml",
+    "GET /blog/search",
+    "POST /blog/comment/{postSlug}/new"
+  ]
+}
