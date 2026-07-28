@@ -59,6 +59,19 @@ describe('mcpResolver.extract — TypeScript (@modelcontextprotocol/sdk)', () =>
     expect(nodes.map((n) => n.name)).toEqual(['TOOL echo', 'TOOL add', 'RESOURCE config']);
     expect(nodes.every((n) => n.kind === 'route' && n.language === 'typescript')).toBe(true);
   });
+
+  it('ignores registrations in test sources (unit-test stubs are not the real surface)', () => {
+    const source = `server.tool("echo", "stub", {}, async () => ({}));\n`
+    for (const testPath of [
+      'ts-sandbox/test/unit/mcp-client.test.ts',
+      'src/__tests__/server.ts',
+      'server.spec.ts',
+      'src/test/kotlin/io/kerno/Foo.kt',
+      'tests/test_server.py',
+    ]) {
+      expect(mcpResolver.extract!(testPath, source).nodes).toEqual([])
+    }
+  });
 });
 
 describe('mcpResolver.extract — Kotlin (constant-referenced names)', () => {

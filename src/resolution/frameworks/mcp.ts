@@ -30,6 +30,20 @@ type McpPrimitive = 'TOOL' | 'RESOURCE' | 'PROMPT';
 // resolved cross-file (in postExtract) to the constant's literal value. Format: `mcp-const:<NAME>`.
 const CONST_MARKER = 'mcp-const:';
 
+// Test sources register tools that aren't the server's real surface (e.g. a stub `server.tool("echo")`
+// in a unit test). Exclude them so detection reports only production registrations — mirroring how the
+// rest of analysis skips test directories.
+function isTestPath(filePath: string): boolean {
+  return (
+    /(^|\/)(tests?|__tests__|__mocks__|spec|fixtures)\//.test(filePath) ||
+    /\/src\/(test|testFixtures|integrationTest)\//.test(filePath) ||
+    /\.(test|spec)\.[cm]?[jt]sx?$/.test(filePath) ||
+    /Test\.kts?$/.test(filePath) ||
+    /(^|\/)(test_[^/]*|conftest)\.py$/.test(filePath) ||
+    /_test\.py$/.test(filePath)
+  );
+}
+
 const PRIMITIVE_VERB: Record<string, McpPrimitive> = {
   tool: 'TOOL',
   registertool: 'TOOL',
@@ -253,6 +267,7 @@ export const mcpResolver: FrameworkResolver = {
   },
 
   extract(filePath, content) {
+    if (isTestPath(filePath)) return { nodes: [], references: [] };
     if (filePath.endsWith('.py')) {
       return extractPythonMcp(filePath, stripCommentsForRegex(content, 'python'));
     }
