@@ -462,6 +462,27 @@ app.route('/', api)
 export default app
 `;
 
+/**
+ * Hono's docs-recommended RPC shape: verbs chained directly off the `Hono`
+ * constructor (typed handlers so `hono/client` can infer types). Mirrors
+ * usekaneo/kaneo's apps/api/src/project/index.ts — a multi-line generic and a
+ * path reused across verbs. Regression for BE-2687 (0 route nodes before fix).
+ */
+export const HONO_CONSTRUCTOR_CHAIN = `
+import { Hono } from 'hono'
+
+const posts = new Hono<{
+  Variables: { userId: string };
+}>()
+  .get('/', listPosts)
+  .post('/', createPost)
+  .get('/:id', getPost)
+  .put('/:id', updatePost)
+  .delete('/:id', deletePost)
+
+export default posts
+`;
+
 /** https://github.com/PatilShreyas/NotyKT — noty-api/.../route/NoteRouter.kt (trimmed) */
 export const NOTYKT_NOTE_ROUTER = `
 package dev.shreyaspatil.noty.api.route

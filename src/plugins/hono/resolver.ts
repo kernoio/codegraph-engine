@@ -601,13 +601,36 @@ function peekReceiverBefore(safe: string, dotIndex: number): string | null {
   let i = dotIndex - 1;
   while (i >= 0 && /\s/.test(safe[i]!)) i--;
   if (i < 0) return null;
-  // End of previous call in a chain: `).post` — not a fresh receiver.
-  if (safe[i] === ')') return null;
+  // End of a previous call: either a genuine chain continuation (`).post` —
+  // inherit via lastRecvByChain) or the constructor that SEEDS the chain
+  // (`const x = new Hono<…>().get`) — seed the receiver from its declaration.
+  if (safe[i] === ')') return receiverFromConstructor(safe, i);
   if (!/[A-Za-z_$]/.test(safe[i]!)) return null;
   let end = i + 1;
   while (i >= 0 && /[A-Za-z0-9_$]/.test(safe[i]!)) i--;
   const name = safe.slice(i + 1, end);
   return name || null;
+}
+
+/**
+ * When a chain's first link hangs off `new Hono<…>()` — `const x = new Hono().get(`
+ * or `const x = new Hono<…>()` ⏎ `.get(` — the character before the dot is the
+ * constructor's `)`, so no receiver identifier precedes it. Seed the receiver
+ * from the enclosing `const/let/var <name> =` so the chain (and every later link
+ * inheriting via lastRecvByChain) resolves. Any other `)` — a real chain
+ * continuation like `).post` — returns null and keeps inheriting as before.
+ */
+function receiverFromConstructor(safe: string, closeParen: number): string | null {
+  const open = matchDelimBackward(safe, closeParen, '(', ')');
+  if (open < 0) return null;
+  const before = safe.slice(0, open);
+  // `const|let|var NAME = new Hono<optional generic>(` — contiguous, so a
+  // `.basePath()`/`.route()` between the constructor and the verb won't match,
+  // and a non-Hono constructor (`new Map()`) is never mis-seeded.
+  const m = before.match(
+    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+Hono\s*(?:<[\s\S]*>)?\s*$/
+  );
+  return m ? m[1]! : null;
 }
 
 function findChainStart(safe: string, index: number): number {
