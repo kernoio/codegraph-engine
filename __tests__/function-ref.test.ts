@@ -788,3 +788,168 @@ describe('Function-as-value capture (#756)', () => {
     }
   });
 });
+
+/**
+ * Python class-as-value capture (BE-2736) — bare class mentions produce
+ * `references` edges, so impact analysis follows the DRF
+ * `get_serializer_class` pattern (`return SerializerCls`), `serializer_class`
+ * assignments, and registry dicts/lists. Python-only via `classValueTargets`;
+ * the TS KIND FILTER contract above is unchanged.
+ */
+describe('Python class-as-value capture (BE-2736)', () => {
+  let tmpDir: string | undefined;
+  afterEach(() => {
+    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
+    tmpDir = undefined;
+  });
+
+  it('DRF pattern: imported class returned from get_serializer_class → references edge', async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cg-fnref-py-drf-'));
+    fs.writeFileSync(
+      path.join(tmpDir, 'serializers.py'),
+      [
+        'class OrgSerializer:',
+        '    def get_role(self):',
+        '        return "ADMIN"',
+      ].join('\n')
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, 'views.py'),
+      [
+        'from serializers import OrgSerializer',
+        '',
+        'class OrgViewSet:',
+        '    def get_serializer_class(self):',
+        '        if True:',
+        '            return OrgSerializer',
+        '        return OrgSerializer',
+      ].join('\n')
+    );
+
+    const cg = CodeGraph.initSync(tmpDir);
+    try {
+      await cg.indexAll();
+      const edges = fnRefEdgesInto(cg, 'OrgSerializer');
+      expect(sourceNames(cg, edges)).toContain('get_serializer_class');
+      // Dedup: one edge per (source, name) even with two return sites.
+      expect(
+        sourceNames(cg, edges).filter((n) => n === 'get_serializer_class')
+      ).toHaveLength(1);
+    } finally {
+      cg.destroy();
+      tmpDir = undefined;
+    }
+  });
+
+  it('same-file class returned from a factory function → references edge', async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cg-fnref-py-samefile-'));
+    fs.writeFileSync(
+      path.join(tmpDir, 'factory.py'),
+      [
+        'class Widget:',
+        '    pass',
+        '',
+        'def widget_cls():',
+        '    return Widget',
+      ].join('\n')
+    );
+
+    const cg = CodeGraph.initSync(tmpDir);
+    try {
+      await cg.indexAll();
+      expect(sourceNames(cg, fnRefEdgesInto(cg, 'Widget'))).toContain('widget_cls');
+    } finally {
+      cg.destroy();
+      tmpDir = undefined;
+    }
+  });
+
+  it('assignment, dict, and list positions → references edges', async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cg-fnref-py-positions-'));
+    fs.writeFileSync(
+      path.join(tmpDir, 'serializers.py'),
+      ['class OrgSerializer:', '    pass'].join('\n')
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, 'registry.py'),
+      [
+        'from serializers import OrgSerializer',
+        '',
+        'DEFAULT_SERIALIZER = OrgSerializer',
+        'BY_NAME = {"org": OrgSerializer}',
+        'ALL_SERIALIZERS = [OrgSerializer]',
+        '',
+        'class OrgView:',
+        '    serializer_class = OrgSerializer',
+      ].join('\n')
+    );
+
+    const cg = CodeGraph.initSync(tmpDir);
+    try {
+      await cg.indexAll();
+      const edges = fnRefEdgesInto(cg, 'OrgSerializer');
+      // At least the module-scope registry positions edge (deduped per
+      // source symbol); the exact source split depends on which node owns
+      // each initializer, so assert presence, not an exact list.
+      expect(edges.length).toBeGreaterThan(0);
+      const sources = sourceNames(cg, edges);
+      expect(sources.length).toBeGreaterThan(0);
+    } finally {
+      cg.destroy();
+      tmpDir = undefined;
+    }
+  });
+
+  it('AMBIGUITY: two same-named classes, no import → no edge (unique-or-drop)', async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cg-fnref-py-ambig-'));
+    fs.writeFileSync(path.join(tmpDir, 'a.py'), 'class Dup:\n    pass');
+    fs.writeFileSync(path.join(tmpDir, 'b.py'), 'class Dup:\n    pass');
+    fs.writeFileSync(
+      path.join(tmpDir, 'c.py'),
+      ['Dup = None  # local shadowing, not an import', 'def pick():', '    return Dup'].join('\n')
+    );
+
+    const cg = CodeGraph.initSync(tmpDir);
+    try {
+      await cg.indexAll();
+      const edges = fnRefEdgesInto(cg, 'Dup').filter((e) => {
+        const src = cg.getNode(e.source);
+        return src?.name === 'pick';
+      });
+      expect(edges).toHaveLength(0);
+    } finally {
+      cg.destroy();
+      tmpDir = undefined;
+    }
+  });
+
+  it('instantiation stays instantiates: `return Cls()` produces no fnRef references edge', async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cg-fnref-py-inst-'));
+    fs.writeFileSync(
+      path.join(tmpDir, 'make.py'),
+      [
+        'class Widget:',
+        '    pass',
+        '',
+        'def make():',
+        '    return Widget()',
+      ].join('\n')
+    );
+
+    const cg = CodeGraph.initSync(tmpDir);
+    try {
+      await cg.indexAll();
+      const widget = cg.getNodesByName('Widget').find((n) => n.kind === 'class')!;
+      const incoming = cg.getIncomingEdges(widget.id);
+      const inst = incoming.filter((e) => e.kind === 'instantiates');
+      expect(sourceNames(cg, inst)).toContain('make');
+      const fnRef = incoming.filter(
+        (e) => e.kind === 'references' && e.metadata?.fnRef === true
+      );
+      expect(fnRef).toHaveLength(0);
+    } finally {
+      cg.destroy();
+      tmpDir = undefined;
+    }
+  });
+});

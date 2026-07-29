@@ -45,7 +45,7 @@ custom `visitNode` hooks like Scala's val/var handler) get a candidates-only
 | C / ObjC | `argument_list` | `assignment_expression.right` | `initializer_pair.value` | `initializer_list`, `init_declarator.value` | `&fn` (`pointer_expression`), `@selector(...)` (ObjC) |
 | C++ | **`&` forms only** in args/rhs/varinit | (same — explicit `&` only) | bare ids at FILE scope only | bare ids at FILE scope only | `&fn`, `&Cls::method` (resolved scoped to the class) |
 | TS / JS (tsx/jsx) | `arguments` | `assignment_expression.right` | `pair.value` | `array`, `variable_declarator.value` | `this.method` (`member_expression`, class-scoped — see rule 3) |
-| Python | `argument_list`, `keyword_argument.value` | `assignment.right` | `pair.value` | `list` | `self.method` (`attribute`) |
+| Python | `argument_list`, `keyword_argument.value` | `assignment.right` | `pair.value` | `list`, `return_statement` (BE-2736) | `self.method` (`attribute`) |
 | Go | `argument_list` | `assignment_statement` / `short_var_declaration` (`expression_list`) | `keyed_element` | `literal_value`, `var_spec.value` | — |
 | Rust | `arguments` | `assignment_expression.right` | `field_initializer.value` | `array_expression`, `static_item` / `let_declaration.value` | — |
 | Java | `argument_list` | `assignment_expression.right` | — | `variable_declarator.value` | `method_reference` (`Cls::m`, `this::m`) — the only form |
@@ -65,7 +65,9 @@ custom `visitNode` hooks like Scala's val/var handler) get a candidates-only
 1. **The gate** (extraction-time): a candidate survives only if its name matches
    a same-file function/method or an **imported binding** (`referenceKind ===
    'imports'` only — scraping type-annotation `references` names let locals that
-   shared a type-member's name through; excalidraw).
+   shared a type-member's name through; excalidraw). Python additionally counts
+   same-file **class** names as defined-here (`classValueTargets`, BE-2736 —
+   see rule 3's Python carve-out).
 2. **C-family ungated file scope**: C has no symbol imports and registers
    callbacks cross-file at repo scale (redis `server.c`'s command table names
    handlers from `t_*.c`). File-scope initializer positions (`value`/`list`
@@ -76,11 +78,21 @@ custom `visitNode` hooks like Scala's val/var handler) get a candidates-only
    `arena_ind_prev = arena_ind` (redis/jemalloc) each matched a unique
    same-named function somewhere and produced wrong edges when `rhs`/`varinit`
    were ungated.
-3. **TS/JS/Python: bare ids resolve to `function` kind only.** A bare
-   identifier can never be a method value in these languages (methods need a
-   receiver — `this.m` / `self.m`), so allowing method targets soaked up
-   locals passed as arguments (`new Set(selectedPointsIndices)`;
-   docopt.py's `name`/`match` params — excalidraw/fmt A/B findings).
+3. **TS/JS/Python: bare ids resolve to `function` kind only — except Python
+   CLASS targets (BE-2736).** A bare identifier can never be a method value
+   in these languages (methods need a receiver — `this.m` / `self.m`), so
+   allowing method targets soaked up locals passed as arguments
+   (`new Set(selectedPointsIndices)`; docopt.py's `name`/`match` params —
+   excalidraw/fmt A/B findings). Python alone (`classValueTargets` on
+   `PYTHON_SPEC` + the language checks in `matchFunctionRef` and the
+   import fast path) also accepts `class` targets: class-as-value is a core
+   Python idiom (DRF `get_serializer_class` returning a serializer,
+   `serializer_class = X`, registry dicts) that impact analysis must follow,
+   and the false-positive mechanism behind the method exclusion doesn't
+   transfer — PascalCase class names don't collide with lowercase
+   locals/params, and the gate + unique-or-drop still apply. TS/JS keep the
+   class exclusion (the KIND FILTER contract in `function-ref.test.ts`);
+   TS recovers class references through type annotations instead.
    TS/JS `this.X` values are captured as `this.`-PREFIXED candidates and
    resolved CLASS-SCOPED (`resolveThisMemberFnRef` in
    `src/resolution/index.ts`): the target must be a function/method whose

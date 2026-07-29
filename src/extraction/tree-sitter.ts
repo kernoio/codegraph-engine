@@ -647,8 +647,11 @@ export class TreeSitterExtractor {
     if (isGeneratedFile(this.filePath)) return;
 
     const definedHere = new Set<string>();
+    const classOk = this.fnRefSpec?.classValueTargets === true;
     for (const n of this.nodes) {
-      if (n.kind === 'function' || n.kind === 'method') definedHere.add(n.name);
+      if (n.kind === 'function' || n.kind === 'method' || (classOk && n.kind === 'class')) {
+        definedHere.add(n.name);
+      }
     }
 
     // Import-binding names only (all binding emitters push kind 'imports').

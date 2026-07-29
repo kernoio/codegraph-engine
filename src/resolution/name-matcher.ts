@@ -200,10 +200,13 @@ function applyLanguageGate(candidates: Node[], ref: UnresolvedRef): Node[] {
  * Resolve a function-as-value reference (#756) — a function name used as a
  * callback/function-pointer value (`register(handler)`, `o->cb = handler`,
  * `{ .cb = handler }`, `signal(SIGINT, handler)`). The ONLY strategy allowed
- * for `function_ref` refs: exact name, function/method targets only, same
- * language family, same-file first, and cross-file only when the match is
- * UNIQUE. No fuzzy fallback, no qualified-name walking — a wrong callback
- * edge is worse than none.
+ * for `function_ref` refs: exact name, function/method targets only (plus
+ * CLASS targets for Python — classValueTargets, BE-2736: `return SomeClass`
+ * / `serializer_class = X` are real dependencies and PascalCase class names
+ * don't collide the way lowercase locals do), same language family,
+ * same-file first, and cross-file only when the match is UNIQUE. No fuzzy
+ * fallback, no qualified-name walking — a wrong callback edge is worse than
+ * none.
  */
 export function matchFunctionRef(
   ref: UnresolvedRef,
@@ -260,11 +263,19 @@ export function matchFunctionRef(
     };
   }
 
+  // Python only (classValueTargets, BE-2736): a bare identifier may also be
+  // a class handed around as a value — the DRF `get_serializer_class`
+  // pattern. Other languages keep the class exclusion (the TS KIND FILTER
+  // contract in function-ref.test.ts).
+  const classTargetsOk = ref.language === 'python';
+
   let candidates = context
     .getNodesByName(ref.referenceName)
     .filter(
       (n) =>
-        (n.kind === 'function' || (!bareFnOnly && n.kind === 'method')) &&
+        (n.kind === 'function' ||
+          (!bareFnOnly && n.kind === 'method') ||
+          (classTargetsOk && n.kind === 'class')) &&
         sameLanguageFamily(n.language, ref.language) &&
         n.id !== ref.fromNodeId // a function registering itself is not a dependency edge
     );

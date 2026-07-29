@@ -12,6 +12,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixes
 
 - Hono routes are now detected when the handlers are chained directly off `new Hono()` (`const app = new Hono().get(...).post(...)`) — the pattern Hono's own RPC docs recommend. Previously a router written this way contributed no routes to the graph.
+- Python code that hands a class around by name — returning it from a factory method, assigning it, or listing it in a registry — now links that class into the graph, so callers and impact analysis follow patterns like Django REST Framework's `get_serializer_class`. Previously these mentions were invisible and impact analysis fell back to whole-file granularity. Re-index existing projects to pick up the new links.
 
 
 ## [1.5.0] - 2026-07-21

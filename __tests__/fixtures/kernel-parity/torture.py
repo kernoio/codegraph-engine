@@ -47,3 +47,28 @@ def shadowed():
 
 handlers = {"recv": target_cb}
 callbacks = [target_cb, view]
+
+
+# BE-2736 — bare class mentions as values: return / assignment / dict / list,
+# same-file (Service) and imported (SerializerCls) forms, plus attribute return.
+from mypkg.serializers import SerializerCls
+
+
+class Factory:
+    serializer_class = SerializerCls
+
+    def get_serializer_class(self):
+        if osp:
+            return SerializerCls
+        return Service
+
+    def get_handler(self):
+        return self.on_ready
+
+    def on_ready(self):
+        pass
+
+
+DEFAULT_CLS = Service
+CLS_BY_NAME = {"svc": Service, "ser": SerializerCls}
+ALL_CLASSES = [Service, SerializerCls]

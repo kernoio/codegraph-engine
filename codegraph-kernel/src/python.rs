@@ -250,7 +250,9 @@ impl<'t> Walker<'t> {
             target_id_str: NONE_STR,
         });
 
-        if kind == "function" || kind == "method" {
+        // "class" included per classValueTargets (BE-2736) — mirrors the
+        // definedHere gate in TreeSitterExtractor.flushFnRefCandidates.
+        if kind == "function" || kind == "method" || kind == "class" {
             self.defined_fn_names.insert(name.to_string());
         }
         // captureValueRefScope
@@ -711,6 +713,10 @@ impl<'t> Walker<'t> {
             "keyword_argument" => ("value", "value"),
             "pair" => ("value", "value"),
             "list" => ("list", ""),
+            // `return SomeClass` (BE-2736) — mirrors PYTHON_SPEC in
+            // src/extraction/function-ref.ts; the returned expression is a
+            // plain named child, so "list" iteration covers it.
+            "return_statement" => ("list", ""),
             _ => return,
         };
         if self.stack.is_empty() {

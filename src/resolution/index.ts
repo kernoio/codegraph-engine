@@ -915,7 +915,15 @@ export class ReferenceResolver {
       const viaImport = this.gateLanguage(resolveViaImport(ref, this.context), ref);
       if (viaImport) {
         const target = this.queries.getNodeById(viaImport.targetNodeId);
-        if (target && (target.kind === 'function' || target.kind === 'method')) {
+        // Python classes are valid fn-ref targets (classValueTargets,
+        // BE-2736) — an imported serializer returned from
+        // get_serializer_class resolves here, through its actual import.
+        if (
+          target &&
+          (target.kind === 'function' ||
+            target.kind === 'method' ||
+            (ref.language === 'python' && target.kind === 'class'))
+        ) {
           return viaImport;
         }
       }
