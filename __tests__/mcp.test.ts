@@ -79,17 +79,34 @@ describe('mcpResolver.extract — Kotlin (constant-referenced names)', () => {
     const { nodes } = mcpResolver.extract!(
       'Registration.kt',
       `fun r() {\n` +
-        `  addCheckedTool(name = KernoMcpToolNames.HEALTHCHECK, description = "hc") {}\n` +
-        `  registerTool(name = "kerno_literal", description = "l") {}\n` +
+        `  addTool(name = ToolNames.HEALTHCHECK, description = "hc") {}\n` +
+        `  registerTool(name = "literal_tool", description = "l") {}\n` +
         `  registerTool(name = tool.name) {}\n` +
         `}\n`,
     );
     const names = nodes.map((n) => n.name);
-    expect(names).toContain('TOOL kerno_literal'); // direct literal
+    expect(names).toContain('TOOL literal_tool'); // direct literal
     expect(names).toContain('TOOL HEALTHCHECK'); // deferred placeholder (resolved in postExtract)
     expect(names).not.toContain('TOOL name'); // `tool.name` is not a constant → skipped
     const deferred = nodes.find((n) => n.name === 'TOOL HEALTHCHECK');
     expect(deferred!.signature).toBe('mcp-const:HEALTHCHECK');
+  });
+
+  it('matches any `…Tool(name = …)` registrar generically — SDK method or a project wrapper — but not other name= calls', () => {
+    const { nodes } = mcpResolver.extract!(
+      'Registration.kt',
+      `fun r() {\n` +
+        `  addTool(name = "std_add") {}\n` + // standard Kotlin SDK
+        `  registerTool(name = "reg_add") {}\n` +
+        `  addCheckedTool(name = "wrapped_add") {}\n` + // a consumer's own thin wrapper
+        `  configureServer(name = "not_a_tool") {}\n` + // unrelated name= call — must be ignored
+        `}\n`,
+    );
+    const names = nodes.map((n) => n.name);
+    expect(names).toContain('TOOL std_add');
+    expect(names).toContain('TOOL reg_add');
+    expect(names).toContain('TOOL wrapped_add');
+    expect(names).not.toContain('TOOL not_a_tool'); // `configureServer` is not a *Tool registrar
   });
 });
 
@@ -131,7 +148,7 @@ describe('mcpResolver — end-to-end indexing', () => {
     cg.close?.();
   });
 
-  it('resolves constant-referenced tool names across Kotlin files (aicore-style)', async () => {
+  it('resolves constant-referenced tool names across Kotlin files (const refs + a wrapper)', async () => {
     // A JVM MCP project: build file declares the SDK; tool names are const references, not literals.
     fs.writeFileSync(
       path.join(dir, 'build.gradle.kts'),
@@ -140,20 +157,20 @@ describe('mcpResolver — end-to-end indexing', () => {
     const src = path.join(dir, 'src');
     fs.mkdirSync(src, { recursive: true });
     fs.writeFileSync(
-      path.join(src, 'KernoMcpToolNames.kt'),
-      `package io.kerno.mcp\n\n` +
-        `object KernoMcpToolNames {\n` +
-        `    const val HEALTHCHECK: String = "kerno_healthcheck"\n` +
-        `    const val LIST_ENDPOINTS: String = "kerno_list_endpoints"\n` +
+      path.join(src, 'McpToolNames.kt'),
+      `package io.example.mcp\n\n` +
+        `object McpToolNames {\n` +
+        `    const val HEALTHCHECK: String = "app_healthcheck"\n` +
+        `    const val LIST_ITEMS: String = "app_list_items"\n` +
         `}\n`,
     );
     fs.writeFileSync(
       path.join(src, 'Registration.kt'),
-      `package io.kerno.mcp\n\n` +
+      `package io.example.mcp\n\n` +
         `fun register() {\n` +
-        `    addCheckedTool(name = KernoMcpToolNames.HEALTHCHECK, description = "hc") {}\n` +
-        `    registerTool(name = KernoMcpToolNames.LIST_ENDPOINTS, description = "le") {}\n` +
-        `    registerTool(name = "kerno_literal_tool", description = "lit") {}\n` +
+        `    addCheckedTool(name = McpToolNames.HEALTHCHECK, description = "hc") {}\n` + // a project's own wrapper
+        `    registerTool(name = McpToolNames.LIST_ITEMS, description = "le") {}\n` +
+        `    registerTool(name = "literal_tool", description = "lit") {}\n` +
         `    registerTool(name = tool.name, description = "dyn") {}\n` +
         `}\n`,
     );
@@ -167,10 +184,10 @@ describe('mcpResolver — end-to-end indexing', () => {
       .map((r: any) => r.name);
 
     // Constant refs resolved to their literal values via postExtract:
-    expect(routes).toContain('TOOL kerno_healthcheck');
-    expect(routes).toContain('TOOL kerno_list_endpoints');
+    expect(routes).toContain('TOOL app_healthcheck');
+    expect(routes).toContain('TOOL app_list_items');
     // Direct literal:
-    expect(routes).toContain('TOOL kerno_literal_tool');
+    expect(routes).toContain('TOOL literal_tool');
     // `tool.name` is not statically resolvable → not emitted:
     expect(routes).not.toContain('TOOL name');
     cg.close?.();

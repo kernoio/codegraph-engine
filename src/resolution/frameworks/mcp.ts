@@ -151,17 +151,21 @@ function extractTsMcp(
 }
 
 /**
- * Kotlin/JVM MCP registration. Unlike Python/TS, JVM servers frequently register a tool with the
- * name passed as a *constant reference* (e.g. `registerTool(name = KernoMcpToolNames.HEALTHCHECK)`
- * or a thin wrapper `addCheckedTool(name = …)`), not a string literal. We emit a route node per
- * registration; when the name is a literal we use it directly, and when it's an UPPER_SNAKE constant
- * reference we defer to [resolveKotlinConstants] (postExtract), which reads the `const val` literal
- * cross-file. Non-constant expressions (e.g. `tool.name`) are unresolvable statically and skipped.
+ * Kotlin/JVM MCP registration. Matched generically as any `…Tool(name = …)` call — the standard SDK
+ * registrars (`addTool`, `registerTool`) plus a project's own thin wrapper (any method whose name
+ * ends in `Tool`), so consumer-specific helpers are covered without hard-coding their names.
+ *
+ * Unlike Python/TS, JVM servers frequently register a tool with the name passed as a *constant
+ * reference* (e.g. `registerTool(name = ToolNames.HEALTHCHECK)`), not a string literal. We emit a
+ * route node per registration; when the name is a literal we use it directly, and when it's an
+ * UPPER_SNAKE constant reference we defer to [resolveKotlinConstants] (postExtract), which reads the
+ * `const val` literal cross-file. Non-constant expressions (e.g. `tool.name`) are unresolvable
+ * statically and skipped.
  */
 function extractKotlinMcp(filePath: string, content: string): FrameworkExtractionResult {
   const nodes: Node[] = [];
   const now = Date.now();
-  const re = /\b(addCheckedTool|registerTool)\s*\(\s*name\s*=\s*([^,\n)]+)/g;
+  const re = /\b(\w*[Tt]ool)\s*\(\s*name\s*=\s*([^,\n)]+)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(content)) !== null) {
     const rawExpr = m[2]!.trim();
