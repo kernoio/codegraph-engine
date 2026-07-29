@@ -29,6 +29,7 @@ import { expoModulesResolver } from './expo-modules';
 import { fabricViewResolver } from './fabric';
 import { cicsResolver } from './cics';
 import { terraformResolver } from './terraform';
+import { mcpResolver } from './mcp';
 import { getBuiltInPluginResolvers } from '../../plugins';
 
 /**
@@ -77,6 +78,8 @@ const FRAMEWORK_RESOLVERS: FrameworkResolver[] = [
   cicsResolver,
   // Terraform / OpenTofu — disambiguate var/local/module/resource refs to same-dir module
   terraformResolver,
+  // MCP servers — tools/resources/prompts as route nodes (verb slot: TOOL/RESOURCE/PROMPT)
+  mcpResolver,
 ];
 
 // Kerno in-repo plugins (tsoa, next-app-router, …) — registered here so parse
@@ -162,6 +165,7 @@ export { reactNativeBridgeResolver } from './react-native';
 export { expoModulesResolver } from './expo-modules';
 export { fabricViewResolver } from './fabric';
 export { terraformResolver } from './terraform';
+export { mcpResolver } from './mcp';
 export {
   tsoaResolver,
   nextAppRouterResolver,
