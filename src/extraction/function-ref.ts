@@ -115,6 +115,19 @@ export interface FnRefSpec {
    * still accept bare identifiers, same as C.
    */
   addressOfOnly?: boolean;
+  /**
+   * Python only (BE-2736): bare identifiers may also resolve to CLASS nodes,
+   * so class-as-value idioms (`return SerializerCls` in a DRF
+   * `get_serializer_class`, `serializer_class = X`, registry dicts/lists)
+   * produce `references` edges. Widens the extraction gate (same-file class
+   * names count as defined-here) and, via the language check in
+   * `matchFunctionRef` / the import fast path, the resolution kind filter.
+   * Safe for Python: class names are PascalCase and rarely collide with the
+   * lowercase locals that motivated the function-only rule (docopt.py), and
+   * the import gate + unique-or-drop still apply. Kernel mirror:
+   * `defined_fn_names` in codegraph-kernel/src/python.rs.
+   */
+  classValueTargets?: boolean;
 }
 
 /** Names that are never function references even when grammars call them identifiers. */
@@ -194,8 +207,14 @@ const PYTHON_SPEC: FnRefSpec = {
     ['keyword_argument', { mode: 'value', field: 'value' }], // Thread(target=worker)
     ['pair', { mode: 'value', field: 'value' }],
     ['list', { mode: 'list' }],
+    // `return SomeClass` — DRF get_serializer_class and factory returns
+    // (BE-2736). The returned expression is a plain named child (no field);
+    // `list` mode iterates named children. Multi-value returns
+    // (`return a, B` → expression_list) and conditionals are not descended.
+    ['return_statement', { mode: 'list' }],
   ]),
   special: new Set(['attribute']),
+  classValueTargets: true,
 };
 
 const GO_SPEC: FnRefSpec = {
