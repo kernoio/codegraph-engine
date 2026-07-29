@@ -97,6 +97,7 @@ import {
   HEADPLANE_ROUTES_TS,
   HMAKE_FASTIFY_USER_ROUTER,
   HONO_BASEPATH_CHAIN_ON,
+  HONO_CONSTRUCTOR_CHAIN,
   HONO_EXAMPLES_BASIC,
   HONO_EXAMPLES_BLOG_API,
   HONO_EXAMPLES_BLOG_INDEX,
@@ -1400,6 +1401,24 @@ describe('hono plugin (framework: Hono)', () => {
       'mutatePost',
       'mutatePost',
       'purgeCache',
+    ]);
+  });
+
+  it('extracts routes chained directly off the Hono constructor (BE-2687)', () => {
+    const result = honoResolver.extract!('src/posts/index.ts', HONO_CONSTRUCTOR_CHAIN);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /:id',
+      'GET /',
+      'GET /:id',
+      'POST /',
+      'PUT /:id',
+    ]);
+    expect(result.references.map((r) => r.referenceName).sort()).toEqual([
+      'createPost',
+      'deletePost',
+      'getPost',
+      'listPosts',
+      'updatePost',
     ]);
   });
 

@@ -1,0 +1,13 @@
+{
+  "framework": "hono",
+  "source": "BE-2687 — constructor-chained router (Hono RPC shape), cross-file mounted",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /posts/:id",
+    "GET /",
+    "GET /posts",
+    "GET /posts/:id",
+    "POST /posts",
+    "PUT /posts/:id"
+  ]
+}

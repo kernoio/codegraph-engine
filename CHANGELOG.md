@@ -9,6 +9,10 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixes
+
+- Hono routes are now detected when the handlers are chained directly off `new Hono()` (`const app = new Hono().get(...).post(...)`) — the pattern Hono's own RPC docs recommend. Previously a router written this way contributed no routes to the graph.
+
 
 ## [1.5.0] - 2026-07-21
 

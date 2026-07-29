@@ -12,6 +12,7 @@
     "nestjs-novu-widgets",
     "fiber-auth-jwt",
     "hono-blog",
+    "hono-constructor-chain",
     "ktor-widgets",
     "sinatra-pizzerias",
     "grape-statuses",
