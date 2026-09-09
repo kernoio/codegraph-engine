@@ -13,6 +13,7 @@
     "fiber-auth-jwt",
     "hono-blog",
     "hono-constructor-chain",
+    "hono-nested-index-mounts",
     "ktor-widgets",
     "sinatra-pizzerias",
     "grape-statuses",

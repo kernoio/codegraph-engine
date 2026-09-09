@@ -3413,3 +3413,105 @@ def construct_falcon_api(debug, healthcheck_path, allowed_origins, iris_sender_a
     return api
 `;
 
+/**
+ * https://github.com/usekaneo/kaneo — apps/api/src/index.ts @ b45eadce (trimmed).
+ * Two-level mount: `app.route('/api', api)` (same file) + `api.route('/task', task)`
+ * where `task` is a DIRECTORY module (`./task` → `task/index.ts`).
+ */
+export const HONO_KANEO_INDEX = `
+import { Hono } from "hono";
+import project from "./project";
+import task from "./task";
+
+export function createApp() {
+  const app = new Hono<AppVariables>();
+  const api = new Hono<ApiVariables>();
+
+  api.get("/health", (c) => c.json({ status: "ok" }));
+
+  const projectApi = api.route("/project", project);
+  const taskApi = api.route("/task", task);
+
+  app.route("/api", api);
+  return { app };
+}
+`;
+
+/**
+ * https://github.com/usekaneo/kaneo — apps/api/src/task/index.ts @ b45eadce (trimmed).
+ * Constructor-chained router whose generic argument contains ";" and "=>".
+ */
+export const HONO_KANEO_TASK_ROUTER = `
+import { Hono } from "hono";
+import { describeRoute, validator } from "hono-openapi";
+import * as v from "valibot";
+
+const task = new Hono<{
+  Variables: {
+    userId: string;
+    workspaceId: string;
+    onDone: (ok: boolean) => void;
+  };
+}>()
+  .get(
+    "/tasks/:projectId",
+    describeRoute({ operationId: "getTasks", tags: ["Tasks"] }),
+    validator("param", v.object({ projectId: v.string() })),
+    async (c) => c.json(await getTasks(c.req.valid("param").projectId)),
+  )
+  .patch("/bulk", validator("json", v.object({ taskIds: v.array(v.string()) })), bulkUpdateTasks)
+  .post("/:projectId", createTask)
+  .put("/title/:id", updateTaskTitle);
+
+export default task;
+`;
+
+/** https://github.com/usekaneo/kaneo — apps/api/src/project/index.ts @ b45eadce (trimmed). */
+export const HONO_KANEO_PROJECT_ROUTER = `
+import { Hono } from "hono";
+
+const project = new Hono<{ Variables: { userId: string } }>()
+  .get("/", listProjects)
+  .post("/", createProject)
+  .get("/:id", getProject);
+
+export default project;
+`;
+
+/** Two constructor-chained routers with generics in one file — the second must seed its own name. */
+export const HONO_TWO_GENERIC_ROUTERS = `
+import { Hono } from 'hono'
+
+const users = new Hono<{ Variables: { userId: string } }>()
+  .get('/', listUsers)
+
+const orders = new Hono<{ Variables: { orderId: string } }>()
+  .get('/:id', getOrder)
+
+export const app = new Hono()
+app.route('/users', users)
+app.route('/orders', orders)
+`;
+
+/** Nested cross-file mounts: index → v1.ts (/v1) → users.ts (/users). */
+export const HONO_NESTED_ROOT = `
+import { Hono } from 'hono'
+import v1 from './v1.js'
+const app = new Hono()
+app.route('/v1', v1)
+export default app
+`;
+export const HONO_NESTED_V1 = `
+import { Hono } from 'hono'
+import users from './users'
+const v1 = new Hono()
+v1.route('/users', users)
+export default v1
+`;
+export const HONO_NESTED_USERS = `
+import { Hono } from 'hono'
+const users = new Hono()
+  .get('/', listUsers)
+  .get('/:id', getUser)
+export default users
+`;
