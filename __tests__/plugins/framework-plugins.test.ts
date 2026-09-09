@@ -97,6 +97,13 @@ import {
   HEADPLANE_ROUTES_TS,
   HMAKE_FASTIFY_USER_ROUTER,
   HONO_BASEPATH_CHAIN_ON,
+  HONO_KANEO_INDEX,
+  HONO_KANEO_PROJECT_ROUTER,
+  HONO_KANEO_TASK_ROUTER,
+  HONO_NESTED_ROOT,
+  HONO_NESTED_USERS,
+  HONO_NESTED_V1,
+  HONO_TWO_GENERIC_ROUTERS,
   HONO_CONSTRUCTOR_CHAIN,
   HONO_EXAMPLES_BASIC,
   HONO_EXAMPLES_BLOG_API,
@@ -1454,6 +1461,70 @@ app.get('/ok', (c) => c.text('ok'))
 `;
     const result = honoResolver.extract!('src/app.ts', src);
     expect(result.nodes.map((n) => n.name)).toEqual(['GET /ok']);
+  });
+
+  it('seeds each constructor-chained router from its own declaration when generics repeat', () => {
+    const result = honoResolver.extract!('src/app.ts', HONO_TWO_GENERIC_ROUTERS);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual(['GET /orders/:id', 'GET /users']);
+  });
+
+  it('extracts a kaneo constructor-chained router whose generic holds `;` and `=>`', () => {
+    const result = honoResolver.extract!('src/task/index.ts', HONO_KANEO_TASK_ROUTER);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /tasks/:projectId',
+      'PATCH /bulk',
+      'POST /:projectId',
+      'PUT /title/:id',
+    ]);
+    expect(result.nodes.every((n) => n.qualifiedName.includes('::@hono:task::'))).toBe(true);
+  });
+
+  it('composes two-level mounts onto directory-index routers in postExtract (kaneo)', () => {
+    const files: Record<string, string> = {
+      'src/index.ts': HONO_KANEO_INDEX,
+      'src/task/index.ts': HONO_KANEO_TASK_ROUTER,
+      'src/project/index.ts': HONO_KANEO_PROJECT_ROUTER,
+    };
+    const nodes = Object.entries(files).flatMap(([f, c]) => honoResolver.extract!(f, c).nodes);
+    const ctx = {
+      getAllFiles: () => Object.keys(files),
+      readFile: (f: string) => files[f] ?? null,
+      iterateNodesByKind: function* (kind: string) {
+        if (kind === 'route') yield* nodes;
+      },
+      getNodesByKind: (kind: string) => (kind === 'route' ? nodes : []),
+    };
+    const updates = honoResolver.postExtract!(ctx as never);
+    expect(updates.map((n) => n.name).sort()).toEqual([
+      'GET /api/project',
+      'GET /api/project/:id',
+      'GET /api/task/tasks/:projectId',
+      'PATCH /api/task/bulk',
+      'POST /api/project',
+      'POST /api/task/:projectId',
+      'PUT /api/task/title/:id',
+    ]);
+    // The same-file `api.get('/health')` already carries /api from extract().
+    expect(nodes.map((n) => n.name)).toContain('GET /api/health');
+  });
+
+  it('propagates nested cross-file mounts and resolves .js specifiers to .ts', () => {
+    const files: Record<string, string> = {
+      'src/index.ts': HONO_NESTED_ROOT,
+      'src/v1.ts': HONO_NESTED_V1,
+      'src/users.ts': HONO_NESTED_USERS,
+    };
+    const nodes = Object.entries(files).flatMap(([f, c]) => honoResolver.extract!(f, c).nodes);
+    const ctx = {
+      getAllFiles: () => Object.keys(files),
+      readFile: (f: string) => files[f] ?? null,
+      iterateNodesByKind: function* (kind: string) {
+        if (kind === 'route') yield* nodes;
+      },
+      getNodesByKind: (kind: string) => (kind === 'route' ? nodes : []),
+    };
+    const updates = honoResolver.postExtract!(ctx as never);
+    expect(updates.map((n) => n.name).sort()).toEqual(['GET /v1/users', 'GET /v1/users/:id']);
   });
 });
 

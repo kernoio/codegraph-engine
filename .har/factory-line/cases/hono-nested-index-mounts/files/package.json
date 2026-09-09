@@ -1,0 +1,6 @@
+{
+  "name": "hono-nested-index-mounts-fixture",
+  "dependencies": {
+    "hono": "^4.0.0"
+  }
+}

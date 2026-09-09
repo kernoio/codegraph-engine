@@ -58,7 +58,10 @@ interface MountEdge {
 interface CrossFileMount {
   prefix: string;
   childFile: string;
+  parentFile: string;
 }
+
+const IMPORT_EXTENSIONS = ['ts', 'tsx', 'mts', 'js', 'mjs', 'cjs', 'jsx'] as const;
 
 export const honoResolver: FrameworkResolver = {
   name: 'hono',
@@ -255,27 +258,27 @@ export const honoResolver: FrameworkResolver = {
    * prefixes routes in the imported module's file.
    */
   postExtract(context: ResolutionContext): Node[] {
-    const mountsByChildFile = new Map<string, string[]>();
+    const allFiles = context.getAllFiles();
+    const fileSet = new Set(allFiles);
+    const mounts: CrossFileMount[] = [];
 
-    for (const filePath of context.getAllFiles()) {
+    for (const filePath of allFiles) {
       if (!/\.(m?[jt]sx?|cjs)$/.test(filePath)) continue;
       const content = context.readFile(filePath);
       if (!content || !isHonoSource(content)) continue;
       const lang = detectLanguage(filePath);
       const safe = stripCommentsForRegex(content, lang);
-      const imports = collectImports(safe, filePath);
-
-      for (const mount of collectCrossFileMounts(safe, imports)) {
-        const list = mountsByChildFile.get(mount.childFile) ?? [];
-        list.push(mount.prefix);
-        mountsByChildFile.set(mount.childFile, list);
-      }
+      const imports = collectImports(safe, filePath, fileSet);
+      // `app.route('/api', api); api.route('/task', task)` — the imported child
+      // hangs under the parent var's OWN same-file prefix, so compose it here.
+      const varPrefixes = computeVarMountPrefixes(collectMounts(safe), collectBasePaths(safe));
+      mounts.push(...collectCrossFileMounts(safe, filePath, imports, varPrefixes));
     }
 
-    if (mountsByChildFile.size === 0) return [];
+    if (mounts.length === 0) return [];
 
-    // Fixpoint: if A mounts B and C mounts A, B gets both prefixes composed.
-    const filePrefixes = propagateFileMounts(mountsByChildFile);
+    // Fixpoint: if index mounts A's file and A mounts B's file, B composes both.
+    const filePrefixes = propagateFileMounts(mounts);
 
     const updates: Node[] = [];
     const routes =
@@ -427,25 +430,38 @@ function computeVarMountPrefixes(
   return out;
 }
 
-function propagateFileMounts(
-  direct: Map<string, string[]>
-): Map<string, string[]> {
-  // direct: childFile → prefixes from immediate parents' files (one hop).
-  // Compose when a file that is itself mounted mounts another.
-  const result = new Map<string, Set<string>>();
-  for (const [file, prefs] of direct) {
-    result.set(file, new Set(prefs));
+/**
+ * Absolute prefixes for every mounted file. A file that is itself mounted
+ * (index → api.ts at /api) passes its prefixes down to the files it mounts
+ * (api.ts → users.ts at /users ⇒ /api/users). Files nobody mounts sit at ''.
+ */
+function propagateFileMounts(mounts: CrossFileMount[]): Map<string, string[]> {
+  const prefixes = new Map<string, Set<string>>();
+  const mountedFiles = new Set(mounts.map((m) => m.childFile));
+  const parentPrefixes = (file: string): string[] => {
+    const set = prefixes.get(file);
+    return set && set.size > 0 ? [...set] : mountedFiles.has(file) ? [] : [''];
+  };
+
+  let changed = true;
+  let guard = 0;
+  while (changed && guard++ < 32) {
+    changed = false;
+    for (const m of mounts) {
+      const childSet = prefixes.get(m.childFile) ?? new Set<string>();
+      for (const pp of parentPrefixes(m.parentFile)) {
+        const full = joinPaths(pp, m.prefix);
+        if (!childSet.has(full)) {
+          childSet.add(full);
+          changed = true;
+        }
+      }
+      prefixes.set(m.childFile, childSet);
+    }
   }
 
-  // We only have child→prefix edges without parent identity; one hop is what
-  // extract+postExtract need for the common `index`→`api` pattern. Nested
-  // file A→B→C needs parent file prefixes — approximate by also treating each
-  // mounted file's prefixes as composable onto files it mounts, using a second
-  // scan is out of scope without parent links. Return direct prefixes.
   const out = new Map<string, string[]>();
-  for (const [file, set] of result) {
-    out.set(file, [...set]);
-  }
+  for (const [file, set] of prefixes) out.set(file, [...set]);
   return out;
 }
 
@@ -467,7 +483,7 @@ interface ImportBind {
   resolvedPath: string;
 }
 
-function collectImports(safe: string, fromFile: string): ImportBind[] {
+function collectImports(safe: string, fromFile: string, fileSet: Set<string>): ImportBind[] {
   const out: ImportBind[] = [];
   // import api from './api'
   // import foo, { bar as baz } from './x'
@@ -477,7 +493,7 @@ function collectImports(safe: string, fromFile: string): ImportBind[] {
   while ((m = re.exec(safe)) !== null) {
     const source = m[3]!;
     if (!source.startsWith('.') && !source.startsWith('/')) continue;
-    const resolved = resolveRelative(fromFile, source);
+    const resolved = resolveImportFile(fromFile, source, fileSet);
     if (m[1]) {
       out.push({ localName: m[1]!, source, resolvedPath: resolved });
     }
@@ -498,18 +514,26 @@ function collectImports(safe: string, fromFile: string): ImportBind[] {
   return out;
 }
 
-function collectCrossFileMounts(safe: string, imports: ImportBind[]): CrossFileMount[] {
+function collectCrossFileMounts(
+  safe: string,
+  parentFile: string,
+  imports: ImportBind[],
+  varPrefixes: Map<string, string[]>
+): CrossFileMount[] {
   const byLocal = new Map(imports.map((i) => [i.localName, i]));
   const out: CrossFileMount[] = [];
   const re =
-    /\b[A-Za-z_$][\w$]*\.route\s*\(\s*['"`]([^'"`]+)['"`]\s*,\s*([A-Za-z_$][\w$]*)/g;
+    /\b([A-Za-z_$][\w$]*)\.route\s*\(\s*['"`]([^'"`]+)['"`]\s*,\s*([A-Za-z_$][\w$]*)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(safe)) !== null) {
-    const prefix = m[1]!;
-    const local = m[2]!;
+    const parent = m[1]!;
+    const prefix = m[2]!;
+    const local = m[3]!;
     const imp = byLocal.get(local);
     if (!imp) continue; // same-file mount — handled in extract()
-    out.push({ prefix, childFile: imp.resolvedPath });
+    for (const parentPrefix of varPrefixes.get(parent) ?? ['']) {
+      out.push({ prefix: joinPaths(parentPrefix, prefix), childFile: imp.resolvedPath, parentFile });
+    }
   }
   return out;
 }
@@ -527,12 +551,29 @@ function resolveRelative(fromFile: string, spec: string): string {
     }
     parts.push(seg);
   }
-  let path = parts.join('/');
-  // Normalize extension-less imports to .ts (factory-line / typical TS layout).
-  if (!/\.[a-z]+$/i.test(path)) {
-    path = `${path}.ts`;
+  return parts.join('/');
+}
+
+/**
+ * Resolve `./task` the way the bundler does, against the indexed file set:
+ * `task.ts` | `task/index.ts` (any JS/TS extension), and an ESM `./task.js`
+ * specifier that really points at `task.ts`. Falls back to `<base>.ts` when
+ * nothing matches so an unresolved import never silently maps to a sibling.
+ */
+function resolveImportFile(fromFile: string, spec: string, fileSet: Set<string>): string {
+  const base = resolveRelative(fromFile, spec);
+  if (fileSet.has(base)) return base;
+  const extMatch = base.match(/\.([cm]?[jt]sx?)$/);
+  const stem = extMatch ? base.slice(0, -extMatch[0].length) : base;
+  for (const ext of IMPORT_EXTENSIONS) {
+    const candidate = `${stem}.${ext}`;
+    if (fileSet.has(candidate)) return candidate;
   }
-  return path;
+  for (const ext of IMPORT_EXTENSIONS) {
+    const candidate = `${stem}/index.${ext}`;
+    if (fileSet.has(candidate)) return candidate;
+  }
+  return extMatch ? base : `${base}.ts`;
 }
 
 // ---------------------------------------------------------------------------
@@ -623,14 +664,38 @@ function peekReceiverBefore(safe: string, dotIndex: number): string | null {
 function receiverFromConstructor(safe: string, closeParen: number): string | null {
   const open = matchDelimBackward(safe, closeParen, '(', ')');
   if (open < 0) return null;
-  const before = safe.slice(0, open);
+  // Step over THIS constructor's `<…>` only — a greedy `<[\s\S]*>` would run
+  // back to the first generic `new Hono<` in the file and seed the wrong var.
+  const genericStart = skipGenericBackward(safe, open);
+  const before = safe.slice(0, genericStart);
   // `const|let|var NAME = new Hono<optional generic>(` — contiguous, so a
   // `.basePath()`/`.route()` between the constructor and the verb won't match,
   // and a non-Hono constructor (`new Map()`) is never mis-seeded.
-  const m = before.match(
-    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+Hono\s*(?:<[\s\S]*>)?\s*$/
-  );
+  const m = before.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+Hono\s*$/);
   return m ? m[1]! : null;
+}
+
+/** Given the index of `(`, return the index where a preceding `<…>` type argument list starts (or `open` itself). */
+function skipGenericBackward(safe: string, open: number): number {
+  let i = open - 1;
+  while (i >= 0 && /\s/.test(safe[i]!)) i--;
+  if (i < 0 || safe[i] !== '>') return open;
+  let depth = 0;
+  for (; i >= 0; i--) {
+    const ch = safe[i]!;
+    if (ch === '>') {
+      // `=>` inside a function type is not a closing bracket.
+      if (i > 0 && safe[i - 1] === '=') {
+        i--;
+        continue;
+      }
+      depth++;
+    } else if (ch === '<') {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return open;
 }
 
 function findChainStart(safe: string, index: number): number {

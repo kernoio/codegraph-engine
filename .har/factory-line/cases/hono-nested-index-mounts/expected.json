@@ -1,0 +1,14 @@
+{
+  "framework": "hono",
+  "source": "usekaneo/kaneo apps/api/src \u2014 two-level mount (app.route('/api', api) + api.route('/task', task)) onto directory-index constructor-chained routers",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /api/health",
+    "GET /api/project",
+    "GET /api/project/:id",
+    "GET /api/task/tasks/:projectId",
+    "POST /api/project",
+    "POST /api/task/:projectId",
+    "PUT /api/task/title/:id"
+  ]
+}
