@@ -35,11 +35,13 @@ export const tsoaResolver: FrameworkResolver = {
         // ignore
       }
     }
+    // Bare `@Get`/`@Post` is not tsoa — NestJS, routing-controllers, and others
+    // share those names. Without a tsoa package, require `@Route(`.
     const allFiles = context.getAllFiles();
     return allFiles.some((f) => {
       if (!TS_FILE.test(f)) return false;
       const content = context.readFile(f);
-      return content != null && (/@Route\s*\(/.test(content) || HTTP_DECORATOR_RE.test(content));
+      return content != null && /@Route\s*\(/.test(content);
     });
   },
 
@@ -78,7 +80,7 @@ export const tsoaResolver: FrameworkResolver = {
 
       for (const hit of findDecorators(safe, HTTP_METHODS)) {
         const scope = scopeFor(scopes, hit.index);
-        if (!scope) continue;
+        if (!scope || scope.isNestController) continue;
 
         const inherited =
           scope.effectivePrefix || prefixByClass.get(`${filePath}::${scope.className}`) || '';
@@ -118,6 +120,11 @@ interface RouteScope {
   className: string;
   prefix: string;
   effectivePrefix: string;
+  /** True when this class or a same-file ancestor declares `@Route`. */
+  isTsoa: boolean;
+  /** True when this class declares `@Controller` (NestJS). */
+  isNestController: boolean;
+  extendsName: string | null;
   start: number;
   end: number;
 }
@@ -140,11 +147,15 @@ function extractFromSafe(
   const scopes = buildRouteScopes(safe);
 
   for (const hit of findDecorators(safe, HTTP_METHODS)) {
+    const scope = scopeFor(scopes, hit.index);
+    // NestJS `@Controller` classes share `@Get`/`@Post` with tsoa; leave them
+    // to the Nest resolver. Allow `@Route` and `extends` (cross-file inherit).
+    if (!scope || scope.isNestController) continue;
+    if (!scope.isTsoa && !scope.extendsName) continue;
     const method = hit.name.toUpperCase();
     const methodPath = parseStringArg(hit.args);
     const line = lineAt(safe, hit.index);
-    const scope = scopeFor(scopes, hit.index);
-    const prefix = scope?.effectivePrefix ?? scope?.prefix ?? '';
+    const prefix = scope.effectivePrefix || scope.prefix;
     const path = joinPath(prefix, methodPath);
     const handler = methodNameAfter(safe, hit.end);
 
@@ -272,6 +283,8 @@ function buildRouteScopes(safe: string): RouteScope[] {
   const extendsMap = new Map<string, string>();
   const classStarts = new Map<string, number>();
 
+  const nestControllers = new Set<string>();
+
   const routeRe = /@Route\s*\(/g;
   let rm: RegExpExecArray | null;
   while ((rm = routeRe.exec(safe)) !== null) {
@@ -279,6 +292,15 @@ function buildRouteScopes(safe: string): RouteScope[] {
     if (!parsed) continue;
     const className = classNameAfter(safe, rm.index);
     if (className) localPrefix.set(className, parseStringArg(parsed.args));
+  }
+
+  const controllerRe = /@Controller\s*\(/g;
+  let cmCtrl: RegExpExecArray | null;
+  while ((cmCtrl = controllerRe.exec(safe)) !== null) {
+    const parsed = readArgs(safe, cmCtrl.index + cmCtrl[0].length - 1);
+    if (!parsed) continue;
+    const className = classNameAfter(safe, cmCtrl.index);
+    if (className) nestControllers.add(className);
   }
 
   const classRe =
@@ -299,6 +321,14 @@ function buildRouteScopes(safe: string): RouteScope[] {
     return effectivePrefix(parent, seen);
   };
 
+  const hasRouteAnnotation = (className: string, seen = new Set<string>()): boolean => {
+    if (seen.has(className)) return false;
+    seen.add(className);
+    if (localPrefix.has(className)) return true;
+    const parent = extendsMap.get(className);
+    return parent ? hasRouteAnnotation(parent, seen) : false;
+  };
+
   const scopes: RouteScope[] = [];
   for (const [className, start] of classStarts) {
     const prefix = localPrefix.get(className) ?? '';
@@ -306,6 +336,9 @@ function buildRouteScopes(safe: string): RouteScope[] {
       className,
       prefix,
       effectivePrefix: effectivePrefix(className),
+      isTsoa: hasRouteAnnotation(className),
+      isNestController: nestControllers.has(className),
+      extendsName: extendsMap.get(className) ?? null,
       start,
       end: safe.length,
     });

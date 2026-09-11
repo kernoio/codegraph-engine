@@ -10,6 +10,8 @@
     "next-endpoint-scope",
     "django-users",
     "nestjs-novu-widgets",
+    "nestjs-global-prefix",
+    "nestjs-uri-version",
     "fiber-auth-jwt",
     "hono-blog",
     "hono-constructor-chain",

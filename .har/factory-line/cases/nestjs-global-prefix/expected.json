@@ -1,0 +1,13 @@
+{
+  "framework": "nestjs",
+  "source": "BE-3181 — docmost setGlobalPrefix('api') + @Controller('auth') + exclude",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /api/attachments/:id",
+    "GET /docs/:spaceSlug",
+    "GET /robots.txt",
+    "POST /api/auth/login",
+    "POST /api/auth/logout",
+    "POST /mcp"
+  ]
+}
