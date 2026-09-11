@@ -1,0 +1,10 @@
+{
+  "framework": "nestjs",
+  "source": "BE-3181 — Ghostfolio setGlobalPrefix('api') + URI defaultVersion + @Controller('activities')",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /api/v1/activities/:id",
+    "GET /api/v1/activities",
+    "POST /api/v1/activities"
+  ]
+}

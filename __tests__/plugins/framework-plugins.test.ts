@@ -341,6 +341,31 @@ export class ChildRoutesController extends SharedRoutesController {
     expect(updates).toHaveLength(1);
     expect(updates[0]!.name).toBe('POST /api/v1/shared/widgets');
   });
+
+  it('does not treat NestJS @Controller + @Post as tsoa routes', () => {
+    const nestSrc = `
+@Controller('auth')
+export class AuthController {
+  @Post('login')
+  login() {}
+}
+`;
+    expect(
+      tsoaResolver.extract!('auth.controller.ts', nestSrc).nodes.map((n) => n.name)
+    ).toEqual([]);
+
+    const nestOnly = {
+      readFile: (p: string) =>
+        p === 'package.json'
+          ? JSON.stringify({ dependencies: { '@nestjs/common': '^10.0.0' } })
+          : p === 'auth.controller.ts'
+            ? nestSrc
+            : null,
+      fileExists: () => true,
+      getAllFiles: () => ['package.json', 'auth.controller.ts'],
+    };
+    expect(tsoaResolver.detect(nestOnly as any)).toBe(false);
+  });
 });
 
 describe('next-app-router plugin (framework: Next.js App Router)', () => {
@@ -504,6 +529,158 @@ describe('nestjs plugin (framework: NestJS)', () => {
     const updates = nestjsKernoResolver.postExtract!(ctx as any);
     expect(updates).toHaveLength(1);
     expect(updates[0]!.name).toBe('GET /api/users');
+  });
+
+  it('composes setGlobalPrefix ahead of @Controller and @Post into one route', () => {
+    const extracted = nestjsKernoResolver.extract!(
+      'auth.controller.ts',
+      `
+@Controller('auth')
+export class AuthController {
+  @Post('login')
+  login() {}
+}
+`
+    );
+    expect(extracted.nodes.map((n) => n.name)).toEqual(['POST /auth/login']);
+    const route = extracted.nodes[0]!;
+    const updates = nestjsKernoResolver.postExtract!({
+      getNodesInFile: () => [route],
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: (kind: string) => (kind === 'route' ? [route] : []),
+      iterateNodesByKind: (kind: string) =>
+        kind === 'route' ? [route][Symbol.iterator]() : [][Symbol.iterator](),
+      fileExists: () => true,
+      readFile: (fp: string) =>
+        fp === 'src/main.ts'
+          ? "app.setGlobalPrefix('api', { exclude: ['robots.txt', 'mcp'] });"
+          : null,
+      getProjectRoot: () => '/test',
+      getAllFiles: () => ['src/main.ts', 'auth.controller.ts'],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    } as any);
+    expect(updates.map((u) => u.name)).toEqual(['POST /api/auth/login']);
+  });
+
+  it('leaves setGlobalPrefix exclude paths unprefixed', () => {
+    const extracted = nestjsKernoResolver.extract!(
+      'public.controller.ts',
+      `
+@Controller()
+export class PublicController {
+  @Get('robots.txt')
+  robots() {}
+}
+
+@Controller('mcp')
+export class McpController {
+  @Post()
+  handle() {}
+}
+`
+    );
+    expect(extracted.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /robots.txt',
+      'POST /mcp',
+    ]);
+    const updates = nestjsKernoResolver.postExtract!({
+      getNodesInFile: () => extracted.nodes,
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: (kind: string) => (kind === 'route' ? extracted.nodes : []),
+      iterateNodesByKind: (kind: string) =>
+        kind === 'route' ? extracted.nodes[Symbol.iterator]() : [][Symbol.iterator](),
+      fileExists: () => true,
+      readFile: (fp: string) =>
+        fp === 'src/main.ts'
+          ? "app.setGlobalPrefix('api', { exclude: ['robots.txt', 'mcp'] });"
+          : null,
+      getProjectRoot: () => '/test',
+      getAllFiles: () => ['src/main.ts', 'public.controller.ts'],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    } as any);
+    expect(updates).toEqual([]);
+  });
+
+  it('prefixes empty @Controller paths and URI defaultVersion without doubling', () => {
+    const attachments = nestjsKernoResolver.extract!(
+      'attachment.controller.ts',
+      `
+@Controller()
+export class AttachmentController {
+  @Get('attachments/:id')
+  get() {}
+}
+`
+    );
+    const activities = nestjsKernoResolver.extract!(
+      'activities.controller.ts',
+      `
+@Controller('activities')
+export class ActivitiesController {
+  @Get()
+  list() {}
+}
+`
+    );
+    const routes = [...attachments.nodes, ...activities.nodes];
+    const updates = nestjsKernoResolver.postExtract!({
+      getNodesInFile: (fp: string) => routes.filter((r) => r.filePath === fp),
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: (kind: string) => (kind === 'route' ? routes : []),
+      iterateNodesByKind: (kind: string) =>
+        kind === 'route' ? routes[Symbol.iterator]() : [][Symbol.iterator](),
+      fileExists: () => true,
+      readFile: (fp: string) =>
+        fp === 'src/main.ts'
+          ? `
+app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+app.setGlobalPrefix('api');
+`
+          : null,
+      getProjectRoot: () => '/test',
+      getAllFiles: () => ['src/main.ts'],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    } as any);
+    expect(updates.map((u) => u.name).sort()).toEqual([
+      'GET /api/v1/activities',
+      'GET /api/v1/attachments/:id',
+    ]);
+  });
+
+  it('does not apply setGlobalPrefix to GraphQL operations', () => {
+    const extracted = nestjsKernoResolver.extract!(
+      'object-metadata.resolver.ts',
+      `
+@Resolver()
+export class ObjectMetadataResolver {
+  @Query()
+  objectRecordCounts() {}
+}
+`
+    );
+    expect(extracted.nodes.map((n) => n.name)).toEqual(['QUERY objectRecordCounts']);
+    const updates = nestjsKernoResolver.postExtract!({
+      getNodesInFile: () => extracted.nodes,
+      getNodesByName: () => [],
+      getNodesByQualifiedName: () => [],
+      getNodesByKind: (kind: string) => (kind === 'route' ? extracted.nodes : []),
+      iterateNodesByKind: (kind: string) =>
+        kind === 'route' ? extracted.nodes[Symbol.iterator]() : [][Symbol.iterator](),
+      fileExists: () => true,
+      readFile: (fp: string) =>
+        fp === 'src/main.ts' ? "app.setGlobalPrefix('api');" : null,
+      getProjectRoot: () => '/test',
+      getAllFiles: () => ['src/main.ts'],
+      getNodesByLowerName: () => [],
+      getImportMappings: () => [],
+    } as any);
+    expect(updates).toEqual([]);
   });
 });
 

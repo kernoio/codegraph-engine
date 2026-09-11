@@ -214,6 +214,12 @@ export const nestjsKernoResolver: FrameworkResolver = {
    * `@Controller('foo') + @Get(':id')` under that same module becomes
    * `GET /admin/users/foo/:id`).
    *
+   * Global prefix and URI default version are composed in Nest's order
+   * (`/{global}/{version}/{router}/{controller}/{method}`) from the original
+   * `qualifiedName` path so the pass stays idempotent and does not emit a
+   * second twin. `setGlobalPrefix(..., { exclude })` leaves matching routes
+   * unprefixed. GraphQL / microservice / WS routes are left alone.
+   *
    * The route node's `id` and `qualifiedName` are deliberately preserved
    * across the update: `id` because existing route→handler edges reference
    * it, `qualifiedName` because it still encodes the *original* in-file
@@ -224,6 +230,7 @@ export const nestjsKernoResolver: FrameworkResolver = {
     const moduleToPrefix = new Map<string, string>();
     const controllerToModule = new Map<string, string>();
     let globalPrefix = '';
+    let globalExcludes: PrefixExclude[] = [];
     let uriDefaultVersion: string | null = null;
 
     for (const filePath of context.getAllFiles()) {
@@ -237,8 +244,15 @@ export const nestjsKernoResolver: FrameworkResolver = {
         collectModuleControllers(safe, controllerToModule);
       }
 
-      const gp = safe.match(/\.setGlobalPrefix\(\s*['"`]([^'"`]+)['"`]/);
-      if (gp) globalPrefix = gp[1]!;
+      const gp = collectSetGlobalPrefix(safe);
+      if (gp) {
+        globalPrefix = gp.prefix;
+        for (const ex of gp.excludes) {
+          if (!globalExcludes.some((e) => e.path === ex.path && e.method === ex.method)) {
+            globalExcludes.push(ex);
+          }
+        }
+      }
 
       if (/VersioningType\.URI/.test(safe)) {
         const ver =
@@ -256,15 +270,7 @@ export const nestjsKernoResolver: FrameworkResolver = {
       }
     }
 
-    const updates: Node[] = [];
-    const seen = new Set<string>();
-
-    const pushUpdate = (node: Node | null) => {
-      if (!node || seen.has(node.id + node.name)) return;
-      seen.add(node.id + node.name);
-      updates.push(node);
-    };
-
+    const routeModulePrefix = new Map<string, string>();
     for (const [controllerName, prefix] of controllerToPrefix) {
       const classes = context
         .getNodesByName(controllerName)
@@ -277,28 +283,49 @@ export const nestjsKernoResolver: FrameworkResolver = {
           if (route.startLine < cls.startLine || route.startLine > cls.endLine) {
             continue;
           }
-          const updated = applyModulePrefix(route, prefix);
-          if (updated && updated.name !== route.name) pushUpdate(updated);
+          routeModulePrefix.set(route.id, prefix);
         }
       }
     }
 
-    const outerPrefix = [globalPrefix, uriDefaultVersion ? `v${uriDefaultVersion}` : '']
-      .map((p) => p.trim().replace(/^\/+|\/+$/g, ''))
-      .filter((p) => p.length > 0)
-      .join('/');
+    const updates: Node[] = [];
+    const seen = new Set<string>();
 
-    if (outerPrefix) {
-      const routes =
-        context.iterateNodesByKind?.('route') != null
-          ? Array.from(context.iterateNodesByKind!('route'))
-          : context.getNodesByKind('route');
-      for (const route of routes) {
-        if (!route.name.includes(' ')) continue;
-        const already = updates.find((u) => u.id === route.id) ?? route;
-        const updated = applyModulePrefix(already, outerPrefix);
-        if (updated && updated.name !== already.name) pushUpdate(updated);
-      }
+    const pushUpdate = (node: Node | null) => {
+      if (!node || seen.has(node.id + node.name)) return;
+      seen.add(node.id + node.name);
+      updates.push(node);
+    };
+
+    const routes =
+      context.iterateNodesByKind?.('route') != null
+        ? Array.from(context.iterateNodesByKind!('route'))
+        : context.getNodesByKind('route');
+
+    for (const route of routes) {
+      if (!isHttpRouteName(route.name)) continue;
+      const parsed = parseRouteQualified(route);
+      if (!parsed) continue;
+
+      const modulePrefix = routeModulePrefix.get(route.id) ?? '';
+      const pathWithoutGlobal = joinHttpPath(modulePrefix, parsed.original);
+      const excluded = routeMatchesExclude(pathWithoutGlobal, parsed.method, globalExcludes);
+
+      const versionSeg =
+        !excluded &&
+        uriDefaultVersion &&
+        !pathAlreadyUriVersioned(parsed.original, uriDefaultVersion)
+          ? `v${uriDefaultVersion}`
+          : '';
+      const globalSeg = excluded ? '' : globalPrefix;
+      const fullPrefix = [globalSeg, versionSeg, modulePrefix]
+        .map((p) => p.trim().replace(/^\/+|\/+$/g, ''))
+        .filter((p) => p.length > 0)
+        .join('/');
+
+      if (!fullPrefix) continue;
+      const updated = applyModulePrefix(route, fullPrefix);
+      if (updated && updated.name !== route.name) pushUpdate(updated);
     }
 
     return updates;
@@ -874,16 +901,116 @@ function classNameAfter(safe: string, start: number): string | null {
  * pass deliberately never mutates — that's what keeps the update idempotent.
  */
 function applyModulePrefix(route: Node, prefix: string): Node | null {
+  const parsed = parseRouteQualified(route);
+  if (!parsed) return null;
+  const newName = `${parsed.method} ${joinHttpPath(prefix, parsed.original)}`;
+  return { ...route, name: newName, updatedAt: Date.now() };
+}
+
+const HTTP_ROUTE_VERBS = new Set([
+  'GET',
+  'POST',
+  'PUT',
+  'PATCH',
+  'DELETE',
+  'HEAD',
+  'OPTIONS',
+  'ALL',
+]);
+
+function isHttpRouteName(name: string): boolean {
+  const space = name.indexOf(' ');
+  if (space < 0) return false;
+  return HTTP_ROUTE_VERBS.has(name.slice(0, space));
+}
+
+function parseRouteQualified(route: Node): { method: string; original: string } | null {
   const sep = '::';
   const idx = route.qualifiedName.indexOf(sep);
   if (idx < 0) return null;
   const tail = route.qualifiedName.slice(idx + sep.length);
   const colon = tail.indexOf(':');
   if (colon < 0) return null;
-  const method = tail.slice(0, colon);
-  const original = tail.slice(colon + 1);
-  const newName = `${method} ${joinHttpPath(prefix, original)}`;
-  return { ...route, name: newName, updatedAt: Date.now() };
+  return { method: tail.slice(0, colon), original: tail.slice(colon + 1) };
+}
+
+interface PrefixExclude {
+  path: string;
+  method?: string;
+}
+
+/** Last `setGlobalPrefix(...)` in the file; exclude entries are parsed from its options. */
+function collectSetGlobalPrefix(
+  safe: string
+): { prefix: string; excludes: PrefixExclude[] } | null {
+  const re = /\.setGlobalPrefix\s*\(/g;
+  let found: { prefix: string; excludes: PrefixExclude[] } | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(safe)) !== null) {
+    const parsed = readArgs(safe, m.index + m[0].length - 1);
+    if (!parsed) continue;
+    const prefix = parseStringArg(parsed.args);
+    if (!prefix) continue;
+    found = { prefix, excludes: parseGlobalPrefixExcludes(parsed.args) };
+    re.lastIndex = parsed.end;
+  }
+  return found;
+}
+
+function parseGlobalPrefixExcludes(args: string): PrefixExclude[] {
+  const inner = parseArrayField(args, 'exclude');
+  if (inner == null) return [];
+  const rules: PrefixExclude[] = [];
+  const objectPaths = new Set<string>();
+  for (const obj of splitTopLevelObjects(inner)) {
+    const path = parseStringField(obj, 'path');
+    if (!path) continue;
+    objectPaths.add(path);
+    const methodMatch = obj.match(/method\s*:\s*RequestMethod\.(\w+)/i);
+    rules.push({
+      path: stripPathEdges(path),
+      method: methodMatch ? methodMatch[1]!.toUpperCase() : undefined,
+    });
+  }
+  for (const m of inner.matchAll(/['"`]([^'"`]+)['"`]/g)) {
+    const raw = m[1]!;
+    if (objectPaths.has(raw)) continue;
+    rules.push({ path: stripPathEdges(raw) });
+  }
+  return rules;
+}
+
+function stripPathEdges(p: string): string {
+  return p.trim().replace(/^\/+|\/+$/g, '');
+}
+
+function pathAlreadyUriVersioned(path: string, defaultVersion: string): boolean {
+  const first = stripPathEdges(path).split('/')[0] ?? '';
+  if (!first) return false;
+  if (first === `v${defaultVersion}`) return true;
+  return /^v\d+$/.test(first);
+}
+
+function routeMatchesExclude(
+  path: string,
+  method: string,
+  rules: PrefixExclude[]
+): boolean {
+  const norm = stripPathEdges(path);
+  for (const rule of rules) {
+    if (rule.method && rule.method !== 'ALL' && rule.method !== method) continue;
+    if (excludePathMatches(norm, rule.path)) return true;
+  }
+  return false;
+}
+
+function excludePathMatches(routePath: string, excludePath: string): boolean {
+  if (routePath === excludePath) return true;
+  const wildcard = excludePath.replace(/\{\/\*wildcard\}$/, '').replace(/\/\*$/, '');
+  if (wildcard !== excludePath && wildcard.length > 0) {
+    return routePath === wildcard || routePath.startsWith(`${wildcard}/`);
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
