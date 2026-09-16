@@ -10,6 +10,7 @@
     "next-endpoint-scope",
     "next-pages-api",
     "django-users",
+    "django-drf-nested",
     "nestjs-novu-widgets",
     "nestjs-global-prefix",
     "nestjs-uri-version",
@@ -51,6 +52,14 @@
       "minRoutes": 1,
       "optional": true,
       "note": "Stock Express resolver smoke \u2014 enable with FACTORY_LINE_CLONE=1"
+    },
+    {
+      "id": "django-realworld",
+      "url": "https://github.com/gothinkster/django-realworld-example-app.git",
+      "shallow": true,
+      "minRoutes": 5,
+      "optional": true,
+      "note": "Django/DRF include() + DefaultRouter \u2014 enable with FACTORY_LINE_CLONE=1"
     },
     {
       "id": "gofiber-boilerplate",
