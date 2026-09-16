@@ -14,6 +14,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
+- Next.js Pages Router API routes now record the HTTP methods they handle (`GET`, `POST`, …) instead of an empty catch-all, so they count as endpoints the same way App Router `route.ts` handlers do.
 - NestJS routes now resolve as `/{global prefix}/{controller}/{handler}` once. A global prefix is no longer inserted after the controller path, `setGlobalPrefix` exclude lists are honoured, and NestJS `@Get`/`@Post` handlers are no longer also emitted as a second un-prefixed tsoa route.
 - Hono routes are now detected when the handlers are chained directly off `new Hono()` (`const app = new Hono().get(...).post(...)`) — the pattern Hono's own RPC docs recommend. Previously a router written this way contributed no routes to the graph.
 - Hono cross-file `app.route()` mounts now resolve directory modules (`import task from './task'` → `task/index.ts`) and ESM `.js` specifiers, compose the parent sub-app's own prefix (`app.route('/api', api)` + `api.route('/task', task)` ⇒ `/api/task/…`), and propagate through nested files. On usekaneo/kaneo 118 of 134 routes previously lost their `/api/<module>` prefix. A constructor-chained router with a generic argument is also seeded from its own declaration instead of the first generic `new Hono<` in the file.
