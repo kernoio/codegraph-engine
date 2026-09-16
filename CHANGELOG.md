@@ -14,6 +14,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
+- Next.js Pages Router API routes now record the HTTP methods they handle (`GET`, `POST`, …) instead of an empty catch-all, so they count as endpoints the same way App Router `route.ts` handlers do.
 - Django `include()` prefixes now compose onto nested routes: a view inside `re_path(..., include([...]))` or an included `urls.py` keeps the outer path, and a Django REST framework `router.register` mounted with `include(router.urls)` keeps the mount prefix.
 - Django REST framework viewsets that inherit from a project-defined base — classes not named `*View` or `*ViewSet` — are now detected when registered on a router.
 - NestJS routes now resolve as `/{global prefix}/{controller}/{handler}` once. A global prefix is no longer inserted after the controller path, `setGlobalPrefix` exclude lists are honoured, and NestJS `@Get`/`@Post` handlers are no longer also emitted as a second un-prefixed tsoa route.

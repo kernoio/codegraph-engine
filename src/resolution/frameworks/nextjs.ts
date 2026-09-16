@@ -13,8 +13,9 @@
  *    component that renders it — exactly as Expo Router's screens do.
  *    `app/api/users/route.ts` exports `GET` / `POST` / … — one route node per
  *    method, `POST /api/users`, with a `references` ref to that function, as
- *    every server resolver names a handler; `pages/api/users.ts` is
- *    `ANY /api/users` bound to its default export.
+ *    every server resolver names a handler; `pages/api/users.ts` is one
+ *    endpoint per `req.method` branch (`POST /api/users`), or `GET` when the
+ *    handler does not name a verb, bound to its default export.
  *
  * 2. **Navigation is a string.** `router.push('/users')` (`next/navigation`,
  *    `next/router`), `redirect('/login')` / `permanentRedirect` in a server
@@ -54,6 +55,73 @@ import {
 
 const ROUTE_LANGUAGES: readonly Language[] = ['typescript', 'javascript', 'tsx', 'jsx'];
 const HTTP_EXPORTS = 'GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS';
+const PAGES_API_HTTP_VERBS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
+
+/**
+ * HTTP methods a Pages Router `pages/api` handler actually branches on.
+ *
+ * Next.js API routes are one default export that inspects `req.method` (docs:
+ * `if (req.method === 'POST')`, the `api-routes-rest` example's
+ * `const { method } = req; switch (method) { case "GET": … }`). Consumers
+ * that only accept GET|POST|… treat a catch-all `ANY` as an empty method, so
+ * each named verb becomes its own `VERB /path` endpoint. A handler that never
+ * mentions a verb is `GET` — the usual unconstrained JSON read — rather than
+ * guessed as every method.
+ */
+export function pagesApiHttpMethods(stripped: string): string[] {
+  const found = new Set<string>();
+  const add = (raw: string | undefined) => {
+    if (!raw) return;
+    const verb = raw.toUpperCase();
+    if ((PAGES_API_HTTP_VERBS as readonly string[]).includes(verb)) found.add(verb);
+  };
+
+  const patterns: RegExp[] = [
+    // req.method === 'POST' / request.method.toLowerCase() === 'get'
+    new RegExp(
+      String.raw`\b(?:req|request)\.method(?:\.to(?:Lower|Upper)Case\(\))?\s*===?\s*['"\`](${HTTP_EXPORTS})['"\`]`,
+      'gi'
+    ),
+    // const { method } = req; if (method === 'POST')
+    new RegExp(String.raw`\bmethod\s*===?\s*['"\`](${HTTP_EXPORTS})['"\`]`, 'gi'),
+    // switch (method) { case 'GET': case "PUT":
+    new RegExp(String.raw`\bcase\s*['"\`](${HTTP_EXPORTS})['"\`]`, 'gi'),
+  ];
+  for (const re of patterns) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(stripped)) !== null) add(m[1]);
+  }
+
+  const fromList = (inner: string) => {
+    const token = new RegExp(String.raw`['"\`](${HTTP_EXPORTS})['"\`]`, 'gi');
+    let t: RegExpExecArray | null;
+    while ((t = token.exec(inner)) !== null) add(t[1]);
+  };
+  // res.setHeader('Allow', ['GET', 'PUT'])
+  const allow = /setHeader\s*\(\s*['"`]Allow['"`]\s*,\s*\[([^\]]+)\]/gi;
+  let allowMatch: RegExpExecArray | null;
+  while ((allowMatch = allow.exec(stripped)) !== null) fromList(allowMatch[1]!);
+  // ['GET', 'POST'].includes(req.method)
+  const includes = /\[([^\]]+)\]\s*\.includes\s*\(\s*(?:req|request)\.method\s*\)/gi;
+  let inc: RegExpExecArray | null;
+  while ((inc = includes.exec(stripped)) !== null) fromList(inc[1]!);
+
+  if (found.size === 0) return ['GET'];
+  return PAGES_API_HTTP_VERBS.filter((v) => found.has(v));
+}
+
+function pagesApiMethodLine(
+  stripped: string,
+  method: string,
+  lineOf: (index: number) => number
+): number {
+  const re = new RegExp(
+    String.raw`\b(?:req|request)\.method(?:\.to(?:Lower|Upper)Case\(\))?\s*===?\s*['"\`]${method}['"\`]|\bmethod\s*===?\s*['"\`]${method}['"\`]|\bcase\s*['"\`]${method}['"\`]`,
+    'i'
+  );
+  const m = re.exec(stripped);
+  return m ? lineOf(m.index) : 0;
+}
 
 // =============================================================================
 // Route files
@@ -274,13 +342,49 @@ export const nextjsResolver: FrameworkResolver = {
       return { nodes, references };
     }
 
-    // A page, or a Pages Router API file: the default export is what runs.
-    const name = file.kind === 'api' ? `ANY ${file.path}` : file.path;
+    if (file.kind === 'api') {
+      const methods = pagesApiHttpMethods(stripped);
+      const exported = defaultExportName(stripped);
+      const exportLine = exported ? lineOf(exported.index) : 1;
+      for (const method of methods) {
+        const line = pagesApiMethodLine(stripped, method, lineOf) || exportLine;
+        const node: Node = {
+          id: `route:${filePath}:${line}:${method}:${file.path}`,
+          kind: 'route',
+          name: `${method} ${file.path}`,
+          qualifiedName: `${filePath}::route:${method}:${file.path}`,
+          filePath,
+          startLine: line,
+          endLine: line,
+          startColumn: 0,
+          endColumn: 0,
+          language,
+          isExported: true,
+          updatedAt: now,
+        };
+        nodes.push(node);
+        if (exported) {
+          references.push({
+            fromNodeId: node.id,
+            referenceName: exported.name,
+            referenceKind: 'references',
+            line: exportLine,
+            column: 0,
+            filePath,
+            language,
+            candidates: [exported.name],
+          });
+        }
+      }
+      return { nodes, references };
+    }
+
+    // A page: the default export is the component that renders it.
     const node: Node = {
-      id: file.kind === 'api' ? `route:${filePath}:1:ANY:${file.path}` : `route:${filePath}:${file.path}`,
+      id: `route:${filePath}:${file.path}`,
       kind: 'route',
-      name,
-      qualifiedName: file.kind === 'api' ? `${filePath}::ANY:${file.path}` : `${filePath}::route:${file.path}`,
+      name: file.path,
+      qualifiedName: `${filePath}::route:${file.path}`,
       filePath,
       startLine: 1,
       endLine: 1,
@@ -296,7 +400,7 @@ export const nextjsResolver: FrameworkResolver = {
       references.push({
         fromNodeId: node.id,
         referenceName: exported.name,
-        referenceKind: file.kind === 'api' ? 'references' : 'calls',
+        referenceKind: 'calls',
         line: lineOf(exported.index),
         column: 0,
         filePath,

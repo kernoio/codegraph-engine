@@ -176,6 +176,61 @@ export async function POST() {
 }
 `;
 
+/** https://nextjs.org/docs/pages/building-your-application/routing/api-routes */
+export const NEXTJS_PAGES_API_HELLO_DOCS = `
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'POST') {
+    // Process a POST request
+  } else {
+    // Handle any other HTTP method
+  }
+}
+`;
+
+/** https://github.com/vercel/next.js — examples/api-routes-rest/pages/api/user/[id].ts */
+export const NEXTJS_PAGES_API_USER_ID = `
+import type { NextApiRequest, NextApiResponse } from "next";
+import type { User } from "../../../interfaces";
+
+export default function userHandler(
+  req: NextApiRequest,
+  res: NextApiResponse<User>,
+) {
+  const { query, method } = req;
+  const id = parseInt(query.id as string, 10);
+  const name = query.name as string;
+
+  switch (method) {
+    case "GET":
+      res.status(200).json({ id, name: \`User \${id}\` });
+      break;
+    case "PUT":
+      res.status(200).json({ id, name: name || \`User \${id}\` });
+      break;
+    default:
+      res.setHeader("Allow", ["GET", "PUT"]);
+      res.status(405).end(\`Method \${method} Not Allowed\`);
+  }
+}
+`;
+
+/** https://github.com/vercel/next.js — examples/api-routes-rest/pages/api/users.ts */
+export const NEXTJS_PAGES_API_USERS = `
+import type { NextApiRequest, NextApiResponse } from "next";
+import type { User } from "../../interfaces";
+
+const users: User[] = [{ id: 1 }, { id: 2 }, { id: 3 }];
+
+export default function handler(
+  _req: NextApiRequest,
+  res: NextApiResponse<User[]>,
+) {
+  res.status(200).json(users);
+}
+`;
+
 /** NestJS URI versioning — @Controller({ path, version }) + @Version on method */
 export const NEST_VERSIONED_CONTROLLER = `
 @Controller({ path: 'cats', version: '1' })

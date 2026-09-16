@@ -6,9 +6,9 @@
  * - **Page UI routes** (`app/.../page.tsx`) are emitted by stock `react` as
  *   `kind: route`, `name: "/path"` (no HTTP verb). They are navigation targets,
  *   not HTTP endpoints, and are excluded from SCIP-comparable endpoint totals.
- * - **HTTP Route Handlers** (`app/.../route.ts`) are emitted by this plugin as
- *   `kind: route`, `name: "METHOD /path"`. Endpoint / SCIP benchmarks count
- *   these only (see `isNextHttpRouteHandler`).
+ * - **HTTP Route Handlers** (`app/.../route.ts`, and Pages Router `pages/api/*`
+ *   from stock `nextjs`) are `kind: route`, `name: "METHOD /path"`. Endpoint /
+ *   SCIP benchmarks count these only (see `isNextHttpRouteHandler`).
  *
  * Both coexist in the graph; consumers must not sum all `kind: route` nodes for
  * Next.js endpoint analysis — that double-counts UI pages (~69 on formbricks)
@@ -23,7 +23,7 @@ export const NEXT_ROUTE_KIND_PAGE = 'page' as const;
 
 const HTTP_METHOD_PREFIX = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+\//;
 
-/** True when a route node is a Next.js App Router HTTP Route Handler. */
+/** True when a route node is a Next.js HTTP handler (App Router `route.ts` or Pages `pages/api`). */
 export function isNextHttpRouteHandler(node: {
   kind: string;
   name: string;
