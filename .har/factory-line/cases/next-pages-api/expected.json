@@ -1,0 +1,11 @@
+{
+  "framework": "nextjs",
+  "endpointScope": "http-handler",
+  "source": "https://github.com/vercel/next.js — examples/api-routes-rest/pages/api + Next.js Pages API docs",
+  "routes": [
+    "POST /api/hello",
+    "GET /api/user/:id",
+    "PUT /api/user/:id",
+    "GET /api/users"
+  ]
+}

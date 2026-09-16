@@ -8,6 +8,7 @@
     "next-signup",
     "next-posts",
     "next-endpoint-scope",
+    "next-pages-api",
     "django-users",
     "nestjs-novu-widgets",
     "nestjs-global-prefix",

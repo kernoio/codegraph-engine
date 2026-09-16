@@ -84,6 +84,9 @@ import {
   FASTIFY_ROUTE_PREFIX_EXAMPLE,
   FIREFLY_PASSPORT_ROUTES,
   FORMBRICKS_HEALTH_ROUTE_REEXPORT,
+  NEXTJS_PAGES_API_HELLO_DOCS,
+  NEXTJS_PAGES_API_USER_ID,
+  NEXTJS_PAGES_API_USERS,
   GRAPE_ON_RACK_API_MOUNT,
   GRAPE_ON_RACK_PING,
   GRAPE_ON_RACK_POST_PUT,
@@ -454,6 +457,31 @@ export async function GET() { return Response.json({ ok: true }); }
     expect(allRoutes.filter(isNextHttpRouteHandler).map((n) => n.name)).toEqual([
       'GET /api/v2/health',
     ]);
+  });
+
+  it('extracts Pages Router req.method === POST from the Next.js docs (via stock nextjs)', () => {
+    const result = nextjsResolver.extract!('pages/api/hello.ts', NEXTJS_PAGES_API_HELLO_DOCS);
+    expect(result.nodes.map((n) => n.name)).toEqual(['POST /api/hello']);
+    expect(result.nodes.every((n) => isNextHttpRouteHandler(n))).toBe(true);
+  });
+
+  it('extracts Pages Router switch (method) GET/PUT from next.js api-routes-rest', () => {
+    const result = nextjsResolver.extract!(
+      'pages/api/user/[id].ts',
+      NEXTJS_PAGES_API_USER_ID
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual([
+      'GET /api/user/:id',
+      'PUT /api/user/:id',
+    ]);
+    expect(result.nodes.every((n) => isNextHttpRouteHandler(n))).toBe(true);
+  });
+
+  it('defaults a Pages Router API with no method check to GET', () => {
+    const result = nextjsResolver.extract!('pages/api/users.ts', NEXTJS_PAGES_API_USERS);
+    expect(result.nodes.map((n) => n.name)).toEqual(['GET /api/users']);
+    expect(isNextHttpRouteHandler(result.nodes[0]!)).toBe(true);
+    expect(isNextPageRoute(result.nodes[0]!)).toBe(false);
   });
 });
 

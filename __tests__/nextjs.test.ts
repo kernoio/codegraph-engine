@@ -76,10 +76,53 @@ describe('nextjs: extract', () => {
     ]);
   });
 
-  it('a Pages Router API file is ANY on its path, bound to the default export', () => {
+  it('a Pages Router API file without a method check is GET, bound to the default export', () => {
     const { nodes, references } = nextjsResolver.extract!('pages/api/users.ts', 'export default async function handler(req, res) {\n  res.status(200).json([])\n}\n');
-    expect(nodes.map((n) => n.name)).toEqual(['ANY /api/users']);
+    expect(nodes.map((n) => n.name)).toEqual(['GET /api/users']);
+    expect(nodes[0]?.qualifiedName).toBe('pages/api/users.ts::route:GET:/api/users');
     expect(references[0]).toMatchObject({ referenceName: 'handler', referenceKind: 'references' });
+  });
+
+  it('a Pages Router API file with req.method === is one endpoint per named verb', () => {
+    const src =
+      "export default function handler(req, res) {\n" +
+      "  if (req.method === 'POST') {\n" +
+      "    res.status(201).json({ ok: true })\n" +
+      "  } else if (req.method === 'GET') {\n" +
+      "    res.status(200).json([])\n" +
+      "  }\n" +
+      "}\n";
+    const { nodes } = nextjsResolver.extract!('pages/api/hello.ts', src);
+    expect(nodes.map((n) => n.name)).toEqual(['GET /api/hello', 'POST /api/hello']);
+  });
+
+  it('a Pages Router API file with switch (method) reads the case verbs', () => {
+    const src =
+      "export default function userHandler(req, res) {\n" +
+      "  const { method } = req\n" +
+      "  switch (method) {\n" +
+      '    case "GET":\n' +
+      "      res.status(200).json({ id: 1 })\n" +
+      "      break\n" +
+      '    case "PUT":\n' +
+      "      res.status(200).json({ id: 1 })\n" +
+      "      break\n" +
+      "  }\n" +
+      "}\n";
+    const { nodes } = nextjsResolver.extract!('pages/api/user/[id].ts', src);
+    expect(nodes.map((n) => n.name)).toEqual(['GET /api/user/:id', 'PUT /api/user/:id']);
+  });
+
+  it('does not treat fetch({ method: POST }) inside a Pages API handler as a verb', () => {
+    const src =
+      "export default async function handler(req, res) {\n" +
+      "  if (req.method === 'GET') {\n" +
+      "    await fetch('https://example.com', { method: 'POST' })\n" +
+      "    res.status(200).json([])\n" +
+      "  }\n" +
+      "}\n";
+    const { nodes } = nextjsResolver.extract!('pages/api/proxy.ts', src);
+    expect(nodes.map((n) => n.name)).toEqual(['GET /api/proxy']);
   });
 
   it('emits nothing for a layout or a component file', () => {

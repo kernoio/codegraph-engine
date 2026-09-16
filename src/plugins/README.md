@@ -41,6 +41,7 @@ nodes for App Router layers, split so neither double-counts the other:
 |--------|------|---------------|--------|----------------------|
 | `nextjs` (stock) | `app/.../page.*` | — | `/dashboard` | No — UI navigation (Screens) |
 | `nextjs` (stock) | `app/.../route.ts` | `export function GET` / `export const GET = …` | `GET /api/health` | Yes |
+| `nextjs` (stock) | `pages/api/*` | `req.method === 'POST'` / `switch (method)` (default `GET`) | `POST /api/hello` | Yes |
 | `kerno-next-app-router` | `app/.../route.ts` | `export { GET, POST } from '…'` (re-export) | `GET /api/health` | Yes |
 
 `kerno-next-app-router` only owns the re-export form — a thin
