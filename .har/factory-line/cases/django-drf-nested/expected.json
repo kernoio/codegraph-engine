@@ -1,0 +1,9 @@
+{
+  "framework": "django",
+  "source": "BE-3183 / BE-3184 / BE-3199 — nested re_path include, project-base ViewSet, DRF router prefix",
+  "routes": [
+    "VIEWSET /api/users",
+    "api/health/",
+    "api/nested/ping/"
+  ]
+}

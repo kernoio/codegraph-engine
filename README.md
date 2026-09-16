@@ -378,7 +378,7 @@ CodeGraph detects web-framework routing files and emits `route` nodes linked by 
 
 | Framework | Shapes recognized |
 |---|---|
-| **Django** | `path()`, `re_path()`, `url()`, `include()` in `urls.py` (CBV `.as_view()`, dotted paths) |
+| **Django** | `path()`, `re_path()`, `url()`, `include()` in `urls.py` (CBV `.as_view()`, dotted paths, nested include prefixes, DRF `router.register`) |
 | **Flask** | `@app.route('/path', methods=[...])`, blueprint routes |
 | **FastAPI** | `@app.get(...)`, `@router.post(...)`, all standard methods |
 | **Express** | `app.get(...)`, `router.post(...)` with middleware chains |

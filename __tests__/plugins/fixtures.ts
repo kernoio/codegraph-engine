@@ -3493,6 +3493,91 @@ app.route('/users', users)
 app.route('/orders', orders)
 `;
 
+/** https://github.com/gothinkster/django-realworld-example-app — conduit/urls.py */
+export const DJANGO_REALWORLD_ROOT_URLS = `
+from django.conf.urls import include, url
+from django.contrib import admin
+
+urlpatterns = [
+    url(r'^admin/', admin.site.urls),
+    url(r'^api/', include('conduit.apps.articles.urls', namespace='articles')),
+    url(r'^api/', include('conduit.apps.authentication.urls', namespace='authentication')),
+    url(r'^api/', include('conduit.apps.profiles.urls', namespace='profiles')),
+]
+`;
+
+/** https://github.com/gothinkster/django-realworld-example-app — conduit/apps/articles/urls.py */
+export const DJANGO_REALWORLD_ARTICLES_URLS = `
+from django.conf.urls import include, url
+from rest_framework.routers import DefaultRouter
+
+from .views import (
+    ArticleViewSet, ArticlesFavoriteAPIView, ArticlesFeedAPIView,
+    CommentsListCreateAPIView, CommentsDestroyAPIView, TagListAPIView
+)
+
+router = DefaultRouter(trailing_slash=False)
+router.register(r'articles', ArticleViewSet)
+
+urlpatterns = [
+    url(r'^', include(router.urls)),
+    url(r'^articles/feed/?$', ArticlesFeedAPIView.as_view()),
+    url(r'^articles/(?P<article_slug>[-\\w]+)/favorite/?$',
+        ArticlesFavoriteAPIView.as_view()),
+    url(r'^articles/(?P<article_slug>[-\\w]+)/comments/?$',
+        CommentsListCreateAPIView.as_view()),
+    url(r'^articles/(?P<article_slug>[-\\w]+)/comments/(?P<comment_pk>[\\d]+)/?$',
+        CommentsDestroyAPIView.as_view()),
+    url(r'^tags/?$', TagListAPIView.as_view()),
+]
+`;
+
+/**
+ * Nested re_path + include([pattern_list]) — Django docs
+ * https://docs.djangoproject.com/en/5.1/topics/http/urls/#including-other-urlconfs
+ * (docs show path(); the same include-list form is used with re_path.)
+ */
+export const DJANGO_NESTED_RE_PATH_INCLUDE = `
+from django.urls import include, re_path, path
+from . import views
+
+urlpatterns = [
+    re_path(r'^pages/', include([
+        path('history/', views.history),
+        path('edit/', views.edit),
+        path('discuss/', views.discuss),
+        path('permissions/', views.permissions),
+    ])),
+]
+`;
+
+/**
+ * DRF viewset whose class name is not *View / *ViewSet — it inherits a
+ * project-defined base (BE-3183). register() still has a string prefix.
+ */
+export const DJANGO_PROJECT_BASE_VIEWSET = `
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
+from rest_framework import viewsets
+
+class BaseAPI(viewsets.ModelViewSet):
+    pagination_class = None
+
+class UserAPI(BaseAPI):
+    queryset = []
+
+class ItemAPI(BaseAPI):
+    queryset = []
+
+router = DefaultRouter()
+router.register(r'users', UserAPI)
+router.register(r'items', ItemAPI)
+
+urlpatterns = [
+    path('api/', include(router.urls)),
+]
+`;
+
 /** Nested cross-file mounts: index → v1.ts (/v1) → users.ts (/users). */
 export const HONO_NESTED_ROOT = `
 import { Hono } from 'hono'

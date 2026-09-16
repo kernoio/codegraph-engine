@@ -10,6 +10,7 @@ import { adonisjsResolver } from '../../src/plugins/adonisjs/resolver';
 import { aiohttpResolver } from '../../src/plugins/aiohttp/resolver';
 import { akkaHttpResolver } from '../../src/plugins/akka-http/resolver';
 import { bottleResolver } from '../../src/plugins/bottle/resolver';
+import { djangoResolver } from '../../src/plugins/django/resolver';
 import { elysiaResolver } from '../../src/plugins/elysia/resolver';
 import { fastEndpointsResolver } from '../../src/plugins/fastendpoints/resolver';
 import { falconResolver } from '../../src/plugins/falcon/resolver';
@@ -69,6 +70,9 @@ import {
   DANIELMACKAY_DELETE_MONKEY_ENDPOINT,
   DANIELMACKAY_GET_MONKEYS_ENDPOINT,
   DANIELMACKAY_MONKEY_GROUP,
+  DJANGO_NESTED_RE_PATH_INCLUDE,
+  DJANGO_PROJECT_BASE_VIEWSET,
+  DJANGO_REALWORLD_ARTICLES_URLS,
   DROPWIZARD_HELLO_WORLD_RESOURCE,
   DROPWIZARD_PERSON_RESOURCE,
   ELFOCRASH_GET_CUSTOMER_ENDPOINT,
@@ -182,6 +186,7 @@ describe('in-repo plugin registry', () => {
       'kerno-aiohttp',
       'kerno-akka-http',
       'kerno-bottle',
+      'kerno-django',
       'kerno-elysia',
       'kerno-falcon',
       'kerno-fastendpoints',
@@ -213,6 +218,7 @@ describe('in-repo plugin registry', () => {
       'aiohttp',
       'akka-http',
       'bottle',
+      'django',
       'elysia',
       'falcon',
       'fastendpoints',
@@ -1051,6 +1057,58 @@ def oops():
 `;
     const result = bottleResolver.extract!('other.py', src);
     expect(result.nodes).toEqual([]);
+  });
+});
+
+describe('django plugin (framework: Django / DRF)', () => {
+  it('extracts django-realworld articles urls (router.register + direct views)', () => {
+    const result = djangoResolver.extract!(
+      'conduit/apps/articles/urls.py',
+      DJANGO_REALWORLD_ARTICLES_URLS
+    );
+    expect(result.nodes.map((n) => n.name)).toEqual(
+      expect.arrayContaining([
+        'VIEWSET /articles',
+        '^articles/feed/?$',
+        '^tags/?$',
+      ])
+    );
+    expect(result.references.map((r) => r.referenceName)).toEqual(
+      expect.arrayContaining(['ArticleViewSet', 'ArticlesFeedAPIView', 'TagListAPIView'])
+    );
+  });
+
+  it('extracts nested re_path include([pattern_list]) inner views', () => {
+    const result = djangoResolver.extract!('pages/urls.py', DJANGO_NESTED_RE_PATH_INCLUDE);
+    expect(result.nodes.map((n) => n.name)).toEqual(
+      expect.arrayContaining(['history/', 'edit/', 'discuss/', 'permissions/', '^pages/'])
+    );
+  });
+
+  it('extracts ViewSets inheriting a project-defined base (UserAPI)', () => {
+    const result = djangoResolver.extract!('app/urls.py', DJANGO_PROJECT_BASE_VIEWSET);
+    expect(result.nodes.map((n) => n.name)).toEqual(
+      expect.arrayContaining(['VIEWSET /users', 'VIEWSET /items'])
+    );
+    expect(result.references.map((r) => r.referenceName)).toEqual(
+      expect.arrayContaining(['UserAPI', 'ItemAPI'])
+    );
+  });
+
+  it('detects Django via requirements.txt and not a Flask-only project', () => {
+    const positive = {
+      readFile: (f: string) => (f === 'requirements.txt' ? 'Django==4.2\ndjangorestframework==3.14\n' : null),
+      fileExists: (f: string) => f === 'requirements.txt',
+      getAllFiles: () => ['requirements.txt'],
+    };
+    expect(djangoResolver.detect(positive as never)).toBe(true);
+
+    const negative = {
+      readFile: (f: string) => (f === 'requirements.txt' ? 'flask==3.0\n' : null),
+      fileExists: () => false,
+      getAllFiles: () => ['requirements.txt'],
+    };
+    expect(djangoResolver.detect(negative as never)).toBe(false);
   });
 });
 
