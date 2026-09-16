@@ -34,13 +34,20 @@ hardenings until those become plugins too.
 
 ## Next.js App Router — page UI vs HTTP handlers (#8)
 
-Stock `react` and `kerno-next-app-router` both emit `kind: route` nodes for
-different App Router layers:
+Stock upstream `nextjs` and `kerno-next-app-router` both emit `kind: route`
+nodes for App Router layers, split so neither double-counts the other:
 
-| Source | File | `name` | SCIP endpoint totals? |
-|--------|------|--------|----------------------|
-| `react` | `app/.../page.*` | `/dashboard` | No — UI navigation |
-| `kerno-next-app-router` | `app/.../route.ts` | `GET /api/health` | Yes |
+| Source | File | Handler form | `name` | SCIP endpoint totals? |
+|--------|------|---------------|--------|----------------------|
+| `nextjs` (stock) | `app/.../page.*` | — | `/dashboard` | No — UI navigation (Screens) |
+| `nextjs` (stock) | `app/.../route.ts` | `export function GET` / `export const GET = …` | `GET /api/health` | Yes |
+| `kerno-next-app-router` | `app/.../route.ts` | `export { GET, POST } from '…'` (re-export) | `GET /api/health` | Yes |
+
+`kerno-next-app-router` only owns the re-export form — a thin
+`app/api/.../route.ts` that re-exports a real handler implemented elsewhere
+(formbricks-style, e.g. `modules/.../route.ts`). Stock `nextjs` already reads
+direct `function`/`const` handler exports, so widening this plugin back to
+that form would double-count the route.
 
 Implementation modules (`modules/**/route.ts`, formbricks-style) are **not**
 indexed — only paths under an `app/` segment are, so re-export stubs are not

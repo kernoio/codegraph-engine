@@ -45,7 +45,7 @@ import {
 } from '../../src/plugins/next-app-router/route-path';
 import { parseRoutesConfig, resolveRouteModulePath } from '../../src/plugins/remix/routes-config';
 import { expressResolver } from '../../src/resolution/frameworks/express';
-import { reactResolver } from '../../src/resolution/frameworks/react';
+import { nextjsResolver } from '../../src/resolution/frameworks/nextjs';
 
 import {
   ADONIS_LEARN_ROUTES,
@@ -377,16 +377,19 @@ describe('next-app-router plugin (framework: Next.js App Router)', () => {
     expect(result.nodes.map((n) => n.name)).toEqual(['GET /api/v2/health']);
   });
 
-  it('extracts cal.com export const POST handlers', () => {
-    const result = nextAppRouterResolver.extract!(
+  // Direct `function`/`const` handler exports are owned by stock upstream
+  // `nextjs` (post-sync); this plugin only owns the re-export form above —
+  // widening it back to direct exports would double-count the route.
+  it('extracts cal.com export const POST handlers (via stock nextjs)', () => {
+    const result = nextjsResolver.extract!(
       'apps/web/app/api/auth/signup/route.ts',
       CALCOM_SIGNUP_ROUTE_CONST
     );
     expect(result.nodes.map((n) => n.name)).toEqual(['POST /api/auth/signup']);
   });
 
-  it('extracts taxonomy export async function GET/POST', () => {
-    const result = nextAppRouterResolver.extract!(
+  it('extracts taxonomy export async function GET/POST (via stock nextjs)', () => {
+    const result = nextjsResolver.extract!(
       'app/api/posts/route.ts',
       TAXONOMY_POSTS_ROUTE_FUNCTION
     );
@@ -396,15 +399,15 @@ describe('next-app-router plugin (framework: Next.js App Router)', () => {
     ]);
   });
 
-  it('does not steal page.tsx UI routes from stock react', () => {
+  it('does not steal page.tsx UI routes from stock nextjs', () => {
     const page = `
 export default function Page() { return null; }
 `;
     const fromPlugin = nextAppRouterResolver.extract!('app/about/page.tsx', page);
     expect(fromPlugin.nodes).toHaveLength(0);
 
-    const fromReact = reactResolver.extract!('app/about/page.tsx', page);
-    expect(fromReact.nodes.map((n) => n.name)).toEqual(['/about']);
+    const fromNextjs = nextjsResolver.extract!('app/about/page.tsx', page);
+    expect(fromNextjs.nodes.map((n) => n.name)).toEqual(['/about']);
   });
 
   it('tags HTTP handlers by METHOD-prefixed route name', () => {
@@ -435,7 +438,7 @@ export async function GET() { return Response.json({ ok: true }); }
 
   it('separates page UI routes from HTTP handlers for endpoint totals', () => {
     const page = `export default function Page() { return null; }`;
-    const pageNodes = reactResolver.extract!('app/(app)/dashboard/page.tsx', page).nodes;
+    const pageNodes = nextjsResolver.extract!('app/(app)/dashboard/page.tsx', page).nodes;
     const handlerNodes = nextAppRouterResolver.extract!(
       'app/api/v2/health/route.ts',
       FORMBRICKS_HEALTH_ROUTE_REEXPORT

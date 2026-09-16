@@ -1,11 +1,14 @@
 /**
  * Next.js App Router Route Handlers (Kerno in-repo plugin)
  *
- * Stock upstream `react` indexes App Router page UI files only (`page.tsx`).
- * This plugin adds HTTP Route Handlers under `app/.../route.ts`:
- *   - `export async function GET`
- *   - `export const GET = …`
+ * Stock upstream `nextjs` resolver already owns `app/.../route.ts` handlers
+ * declared as `export async function GET` / `export const GET = …`. This
+ * plugin only adds the case stock leaves uncovered: a re-export handler,
  *   - `export { GET, POST } from '…'`
+ * (formbricks-style — a thin `app/api/.../route.ts` that re-exports a real
+ * handler implemented elsewhere, e.g. `modules/.../route.ts`). Do not widen
+ * this back to direct `function`/`const` exports — stock `nextjs` already
+ * emits those, and doing so here double-counts the route.
  *
  * Only files under an `app/` segment are indexed — implementation modules such
  * as `modules/.../route.ts` (formbricks-style) are intentionally excluded so
@@ -72,11 +75,7 @@ export const nextAppRouterResolver: FrameworkResolver = {
     const nodes: Node[] = [];
 
     for (const method of httpExports) {
-      const line = content.search(
-        new RegExp(
-          `\\bexport\\s+(?:async\\s+)?(?:function\\s+|const\\s+)${method}\\b|\\bexport\\s*\\{[^}]*\\b${method}\\b`
-        )
-      );
+      const line = content.search(new RegExp(`\\bexport\\s*\\{[^}]*\\b${method}\\b`));
       const lineNum = line >= 0 ? content.slice(0, line).split('\n').length : 1;
       nodes.push({
         id: `route:${filePath}:${routePath}:${method}:${lineNum}`,
@@ -99,15 +98,8 @@ export const nextAppRouterResolver: FrameworkResolver = {
 
 function collectHttpRouteExports(content: string): string[] {
   const found = new Set<string>();
-  const fnOrConst = new RegExp(
-    `\\bexport\\s+(?:async\\s+)?(?:function\\s+|const\\s+)(${HTTP_ROUTE_METHODS.join('|')})\\b`,
-    'g'
-  );
-  let m: RegExpExecArray | null;
-  while ((m = fnOrConst.exec(content)) !== null) {
-    found.add(m[1]!);
-  }
   const reExport = /\bexport\s*\{([^}]+)\}/g;
+  let m: RegExpExecArray | null;
   while ((m = reExport.exec(content)) !== null) {
     for (const part of m[1]!.split(',')) {
       const name = part.trim().split(/\s+as\s+/i)[0]?.trim();
