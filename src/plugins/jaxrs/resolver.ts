@@ -151,8 +151,10 @@ function extractFromSafe(
 
 function buildClassScopes(safe: string): ClassScope[] {
   const scopes: ClassScope[] = [];
+  // Type names are PascalCase — avoids prose like "user interface screens" in
+  // OpenAPI text blocks being parsed as a spurious `interface` declaration.
   const classRe =
-    /(?:(?:public|protected|private|final|abstract|open|data|sealed|static)\s+)*(?:class|interface)\s+([A-Za-z_]\w*)/g;
+    /(?:(?:public|protected|private|final|abstract|open|data|sealed|static)\s+)*(?:class|interface)\s+([A-Z][A-Za-z0-9_]*)/g;
   let cm: RegExpExecArray | null;
   while ((cm = classRe.exec(safe)) !== null) {
     const className = cm[1]!;
@@ -202,19 +204,23 @@ function classPathBefore(safe: string, classIndex: number): string {
 }
 
 function findMethodPath(safe: string, verbIndex: number): string {
-  const before = safe.slice(Math.max(0, verbIndex - 500), verbIndex);
-  const lastBreak = Math.max(
-    before.lastIndexOf('}'),
-    before.lastIndexOf(';'),
-    before.lastIndexOf('{')
-  );
-  const backRegion = before.slice(lastBreak + 1);
+  let regionStart = verbIndex;
+  while (regionStart > 0) {
+    const lineStart = safe.lastIndexOf('\n', regionStart - 1) + 1;
+    if (lineStart >= regionStart) break;
+    const line = safe.slice(lineStart, regionStart).replace(/\s+$/, '');
+    if (line === '' || /^@[\w.]/.test(line.trim())) {
+      regionStart = lineStart;
+      continue;
+    }
+    break;
+  }
 
   const after = safe.slice(verbIndex, verbIndex + 800);
   const forwardEnd = after.search(/\b(?:public|private|protected|fun)\b/);
   const forwardRegion = forwardEnd >= 0 ? after.slice(0, forwardEnd) : after.slice(0, 400);
 
-  const region = backRegion + forwardRegion;
+  const region = safe.slice(regionStart, verbIndex) + forwardRegion;
   let path = '';
   const pathRe = /@Path\s*\(([^)]*)\)/g;
   let pm: RegExpExecArray | null;

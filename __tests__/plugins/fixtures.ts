@@ -1296,6 +1296,72 @@ public class FruitResource {
 }
 `;
 
+/**
+ * Regression for BE-3227 — Apache Fineract ChargesApiResource shape: class-level
+ * @Path, mixed method paths, and OpenAPI text blocks containing prose like
+ * "user interface screens" that must not be parsed as `interface` declarations.
+ */
+export const FINERACT_CHARGES_API_RESOURCE = `
+package org.apache.fineract.portfolio.charge.api;
+
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import org.springframework.stereotype.Component;
+
+@Path("/v1/charges")
+@Component
+public class ChargesApiResource {
+
+    @GET
+    @Produces({ MediaType.APPLICATION_JSON })
+    public java.util.List<ChargeData> retrieveAllCharges() {
+        return null;
+    }
+
+    @GET
+    @Path("{chargeId}")
+    @Produces({ MediaType.APPLICATION_JSON })
+    public ChargeData retrieveCharge(Long chargeId) {
+        return null;
+    }
+
+    @GET
+    @Path("template")
+    @Produces({ MediaType.APPLICATION_JSON })
+    @Operation(description = """
+            This is a convenience resource. It can be useful when building maintenance user interface screens for client applications.
+            """)
+    public ChargeData retrieveNewChargeDetails() {
+        return null;
+    }
+
+    @POST
+    @Produces({ MediaType.APPLICATION_JSON })
+    public CommandProcessingResult createCharge() {
+        return null;
+    }
+
+    @PUT
+    @Path("{chargeId}")
+    @Produces({ MediaType.APPLICATION_JSON })
+    public CommandProcessingResult updateCharge(Long chargeId) {
+        return null;
+    }
+
+    @DELETE
+    @Path("{chargeId}")
+    @Produces({ MediaType.APPLICATION_JSON })
+    public CommandProcessingResult deleteCharge(Long chargeId) {
+        return null;
+    }
+}
+`;
+
 /** https://github.com/kestra-io/kestra — webserver/.../controllers/api/HelloController-shaped MiscController (trimmed) */
 export const KESTRA_MISC_CONTROLLER = `
 package io.kestra.webserver.controllers.api;

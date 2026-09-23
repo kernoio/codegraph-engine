@@ -75,6 +75,7 @@ import {
   DJANGO_REALWORLD_ARTICLES_URLS,
   DROPWIZARD_HELLO_WORLD_RESOURCE,
   DROPWIZARD_PERSON_RESOURCE,
+  FINERACT_CHARGES_API_RESOURCE,
   ELFOCRASH_GET_CUSTOMER_ENDPOINT,
   ELYSIA_AUTH_GROUP,
   ELYSIA_CONVERTX_HEALTHCHECK,
@@ -1943,6 +1944,21 @@ describe('jaxrs plugin (framework: JAX-RS / Quarkus / Jersey / Dropwizard)', () 
       'DELETE /fruits',
       'GET /fruits',
       'POST /fruits',
+    ]);
+  });
+
+  it('keeps class-level @Path for methods after a method-level @Path (Fineract)', () => {
+    const result = jaxrsResolver.extract!(
+      'fineract-charge/src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java',
+      FINERACT_CHARGES_API_RESOURCE
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /v1/charges/{chargeId}',
+      'GET /v1/charges',
+      'GET /v1/charges/template',
+      'GET /v1/charges/{chargeId}',
+      'POST /v1/charges',
+      'PUT /v1/charges/{chargeId}',
     ]);
   });
 
