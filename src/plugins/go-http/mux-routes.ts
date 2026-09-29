@@ -22,6 +22,13 @@ export const GO_MUX_RECEIVER_MARKER = '::@mux:';
 /** Marker in route qualifiedName holding the function a Mount() call targets. */
 export const GO_MOUNT_MARKER = '::@gomount:';
 
+/**
+ * Marker for a route registered on a function parameter whose caller lives in
+ * another file. Value is `FuncName:paramIndex`. postExtract prepends the
+ * group prefix passed at the call site.
+ */
+export const GO_GROUP_FN_MARKER = '::@gogroupfn:';
+
 export interface GoRouteExtractResult {
   nodes: Node[];
   references: UnresolvedRef[];
@@ -38,14 +45,18 @@ interface PendingGoRoute {
   isHandle: boolean;
 }
 
-/** Extract route nodes from a Go source file. */
-export function extractGoHttpRoutes(filePath: string, content: string): GoRouteExtractResult {
+/** Extract route nodes from a Go source file. `consts` supplies string constants declared in other files. */
+export function extractGoHttpRoutes(
+  filePath: string,
+  content: string,
+  consts?: Map<string, string>
+): GoRouteExtractResult {
   if (!filePath.endsWith('.go')) return { nodes: [], references: [] };
   const nodes: Node[] = [];
   const references: UnresolvedRef[] = [];
   const now = Date.now();
   const safe = stripCommentsForRegex(content, 'go');
-  const prefixes = buildGoPrefixIndex(safe);
+  const prefixes = buildGoPrefixIndex(safe, consts);
   const pending: PendingGoRoute[] = [];
 
   const routeHeadRe =
@@ -275,15 +286,21 @@ export function extractGoHttpRoutes(filePath: string, content: string): GoRouteE
  */
 export function collectGroupVarPrefixes(content: string): Map<string, string> {
   const safe = stripCommentsForRegex(content, 'go');
+  const consts = mergeGoConsts(safe, undefined);
+  const imports = parseGoImports(safe);
   const edges: Array<{ child: string; parent: string; path: string }> = [];
 
-  const groupRe = /\b(\w+)\s*:?=\s*([\w.]+)\.Group\(\s*"([^"]*)"/g;
+  const groupRe = /\b(\w+)\s*:?=\s*([\w.]+)\.Group\s*\(/g;
   let m: RegExpExecArray | null;
   while ((m = groupRe.exec(safe)) !== null) {
+    const open = safe.indexOf('(', m.index + m[1]!.length);
+    const arg = open >= 0 ? readFirstArg(safe, open) : null;
+    const path = arg == null ? null : resolveGoPrefixExpr(arg, consts, imports);
+    if (path === null) continue;
     edges.push({
       child: m[1]!,
       parent: receiverLeafName(m[2]!),
-      path: m[3]!,
+      path,
     });
   }
 
@@ -315,26 +332,320 @@ export function collectGroupVarPrefixes(content: string): Map<string, string> {
   return resolved;
 }
 
-/** Collect mux subrouter field → path prefix from Routes struct comments and PathPrefix assignments. */
-export function collectMuxRoutePrefixes(content: string): Map<string, string> {
+/**
+ * Collect mux subrouter field → path prefix.
+ * A struct-comment path (`Users *mux.Router // 'api/v4/users'`) is authoritative
+ * and wins over a partial `PathPrefix` assignment. Assignments without a comment
+ * compose onto the parent subrouter, and a non-literal argument keeps its
+ * string-literal and const parts (`model.APIURLSuffix`, `base + "/api/v4"`).
+ */
+export function collectMuxRoutePrefixes(
+  content: string,
+  consts?: Map<string, string>
+): Map<string, string> {
   const safe = stripCommentsForRegex(content, 'go');
-  const out = new Map<string, string>();
+  const allConsts = mergeGoConsts(safe, consts);
+  const imports = parseGoImports(safe);
+  const comments = collectMuxCommentPrefixes(content);
 
-  // api.BaseRoutes.Users = api.BaseRoutes.ApiRoot.PathPrefix("/users").Subrouter()
-  const assignRe =
-    /(?:BaseRoutes|Routes|r)\.(\w+)\s*=\s*(?:[\w.]+\.)*PathPrefix\(\s*"([^"]+)"\s*\)/g;
+  interface MuxEdge {
+    child: string;
+    parent: string | null;
+    path: string;
+  }
+  const edges: MuxEdge[] = [];
+  const assignRe = /(?:BaseRoutes|Routes|r)\.(\w+)\s*=\s*([\w.]*)\.PathPrefix\s*\(/g;
   let m: RegExpExecArray | null;
   while ((m = assignRe.exec(safe)) !== null) {
+    const open = safe.indexOf('(', m.index);
+    const arg = open >= 0 ? readFirstArg(safe, open) : null;
+    const path = arg == null ? null : resolveGoPrefixExpr(arg, allConsts, imports);
+    if (path === null) continue;
+    edges.push({
+      child: m[1]!,
+      parent: muxParentField(m[2]!),
+      path,
+    });
+  }
+
+  const out = new Map(comments);
+  for (let pass = 0; pass < 12; pass++) {
+    let changed = false;
+    for (const edge of edges) {
+      if (comments.has(edge.child)) continue;
+      const parentPrefix = edge.parent ? (out.get(edge.parent) ?? '') : '';
+      const full = joinGoPath(parentPrefix || '/', edge.path);
+      if (out.get(edge.child) !== full) {
+        out.set(edge.child, full);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  return out;
+}
+
+/** Struct-comment paths, read from the raw source so comment-stripping cannot drop them. */
+function collectMuxCommentPrefixes(content: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const structRe = /(\w+)\s+\*mux\.Router\s*\/\/\s*'([^']+)'/g;
+  let m: RegExpExecArray | null;
+  while ((m = structRe.exec(content)) !== null) {
     out.set(m[1]!, normalizeMuxPrefix(m[2]!));
   }
-
-  // Users *mux.Router // 'api/v4/users'
-  const structRe = /(\w+)\s+\*mux\.Router\s*\/\/\s*'([^']+)'/g;
-  while ((m = structRe.exec(safe)) !== null) {
-    if (!out.has(m[1]!)) out.set(m[1]!, normalizeMuxPrefix(m[2]!));
-  }
-
   return out;
+}
+
+function muxParentField(receiver: string): string | null {
+  const leaf = receiver.split('.').filter(Boolean).pop() ?? '';
+  if (!leaf || leaf === 'Router' || leaf === 'r') return null;
+  return leaf;
+}
+
+/** Keep the longer path when one is a suffix of the other (partial assignment vs full comment). */
+export function preferMuxPrefix(current: string | undefined, next: string): string {
+  if (!current) return next;
+  const c = current.replace(/^\/+/, '');
+  const n = next.replace(/^\/+/, '');
+  if (c.endsWith('/' + n) || c.endsWith(n) && c.length > n.length) return current;
+  if (n.length > c.length && (n.endsWith('/' + c) || n.endsWith(c))) return next;
+  return next;
+}
+
+export function collectGoStringConsts(content: string): Map<string, string> {
+  const src = stripCommentsForRegex(content, 'go');
+  const out = new Map<string, string>();
+  const pkg = /^\s*package\s+(\w+)/m.exec(src)?.[1];
+  const add = (name: string, value: string) => {
+    out.set(name, value);
+    if (pkg) out.set(`${pkg}.${name}`, value);
+  };
+  const spec = /(\w+)\s*(?:string\s*)?=\s*"([^"]*)"/g;
+  const single = /\bconst\s+(\w+)\s*(?:string\s*)?=\s*"([^"]*)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = single.exec(src)) !== null) add(m[1]!, m[2]!);
+  const block = /\bconst\s*\(([^)]*)\)/g;
+  while ((m = block.exec(src)) !== null) {
+    const body = m[1]!;
+    let s: RegExpExecArray | null;
+    spec.lastIndex = 0;
+    while ((s = spec.exec(body)) !== null) add(s[1]!, s[2]!);
+  }
+  return out;
+}
+
+function mergeGoConsts(src: string, extra: Map<string, string> | undefined): Map<string, string> {
+  const out = new Map(extra ?? []);
+  for (const [key, value] of collectGoStringConsts(src)) out.set(key, value);
+  return out;
+}
+
+/**
+ * Literal portion of a prefix expression. Unknown identifiers are skipped, so
+ * `base + "/api/v1"` contributes `/api/v1` and `constants.APIPrefix + "/slave"`
+ * contributes the const value plus `/slave`. Returns null when the expression
+ * has no literal or const part (a bare `base`).
+ */
+export function resolveGoPrefixExpr(
+  expr: string,
+  consts: Map<string, string>,
+  imports: Map<string, string>
+): string | null {
+  let s = expr.trim();
+  if (s.startsWith('(') && s.endsWith(')')) s = s.slice(1, -1).trim();
+  const parts = splitTopLevel(s, '+');
+  let value = '';
+  let any = false;
+  for (const part of parts) {
+    const token = part.trim();
+    if (!token) continue;
+    const lit = token.match(/^"([^"]*)"$/);
+    if (lit) {
+      value += lit[1]!;
+      any = true;
+      continue;
+    }
+    const raw = token.match(/^`([^`]*)`$/);
+    if (raw) {
+      value += raw[1]!;
+      any = true;
+      continue;
+    }
+    const resolved = lookupGoConst(token, consts, imports);
+    if (resolved != null) {
+      value += resolved;
+      any = true;
+    }
+  }
+  return any ? value : null;
+}
+
+function lookupGoConst(
+  token: string,
+  consts: Map<string, string>,
+  imports: Map<string, string>
+): string | null {
+  if (consts.has(token)) return consts.get(token)!;
+  const dot = token.lastIndexOf('.');
+  if (dot <= 0) return null;
+  const alias = token.slice(0, dot);
+  const name = token.slice(dot + 1);
+  const importPath = imports.get(alias);
+  if (!importPath) return null;
+  const pkg = importPath.split('/').pop();
+  if (!pkg) return null;
+  return consts.get(`${pkg}.${name}`) ?? null;
+}
+
+function splitTopLevel(expr: string, op: string): string[] {
+  const parts: string[] = [];
+  let start = 0;
+  let depth = 0;
+  for (let i = 0; i < expr.length; i++) {
+    const c = expr[i]!;
+    if (c === '"') {
+      i = skipGoString(expr, i);
+      continue;
+    }
+    if (c === '`') {
+      i = skipGoRaw(expr, i);
+      continue;
+    }
+    if (c === '(' || c === '[' || c === '{') depth++;
+    else if (c === ')' || c === ']' || c === '}') depth = Math.max(0, depth - 1);
+    else if (c === op && depth === 0) {
+      parts.push(expr.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(expr.slice(start));
+  return parts;
+}
+
+/** First argument of a call, or null when the call starts with a func literal. */
+function readFirstArg(src: string, openParen: number): string | null {
+  let i = skipWs(src, openParen + 1);
+  if (i >= src.length) return null;
+  if (src.startsWith('func', i) && identBoundary(src, i)) return null;
+  const start = i;
+  let depth = 0;
+  while (i < src.length) {
+    const c = src[i]!;
+    if (c === '"') {
+      i = skipGoString(src, i) + 1;
+      continue;
+    }
+    if (c === '`') {
+      i = skipGoRaw(src, i) + 1;
+      continue;
+    }
+    if (c === '\'') {
+      i = skipGoString(src, i) + 1;
+      continue;
+    }
+    if (c === '(' || c === '{' || c === '[') {
+      depth++;
+      i++;
+      continue;
+    }
+    if (c === ')' || c === '}' || c === ']') {
+      if (depth === 0) return src.slice(start, i).trim();
+      depth--;
+      i++;
+      continue;
+    }
+    if (c === ',' && depth === 0) return src.slice(start, i).trim();
+    i++;
+  }
+  return null;
+}
+
+function findFuncCalls(src: string, name: string): Array<{ index: number; args: string[] }> {
+  const out: Array<{ index: number; args: string[] }> = [];
+  const re = new RegExp(`(?:^|[^\\w])${name}\\s*\\(`, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src)) !== null) {
+    const open = src.indexOf('(', m.index);
+    if (open < 0) continue;
+    const nameIndex = open - name.length;
+    const before = src.slice(Math.max(0, nameIndex - 80), nameIndex);
+    if (/\bfunc\b[^;{}]*$/.test(before)) continue;
+    const call = scanBalancedCode(src, open);
+    if (!call) continue;
+    out.push({ index: open, args: splitTopLevel(call.slice(1, -1), ',') });
+  }
+  return out;
+}
+
+/** `FuncName:paramIndex` → call-site group prefix, when every call agrees. */
+export function collectGoGroupFnPrefixes(
+  files: Array<{ filePath: string; content: string }>,
+  wanted: Map<string, { name: string; paramIndex: number }>,
+  consts: Map<string, string>
+): Map<string, string> {
+  const found = new Map<string, Set<string>>();
+  for (const file of files) {
+    const safe = stripCommentsForRegex(file.content, 'go');
+    const index = buildGoPrefixIndex(safe, consts);
+    for (const [key, spec] of wanted) {
+      for (const call of findFuncCalls(safe, spec.name)) {
+        const arg = call.args[spec.paramIndex];
+        if (arg == null) continue;
+        const leaf = receiverLeafName(arg.trim());
+        if (!leaf || !/^[\w.]+$/.test(arg.trim())) continue;
+        const prefix = index.prefixFor(leaf, call.index);
+        if (!prefix) continue;
+        let set = found.get(key);
+        if (!set) {
+          set = new Set();
+          found.set(key, set);
+        }
+        set.add(prefix);
+      }
+    }
+  }
+  const out = new Map<string, string>();
+  for (const [key, set] of found) {
+    if (set.size === 1) out.set(key, [...set][0]!);
+  }
+  return out;
+}
+
+export function readGoGroupFn(qualifiedName: string): { key: string; name: string; paramIndex: number } | null {
+  const raw = markerValue(qualifiedName, GO_GROUP_FN_MARKER);
+  if (!raw) return null;
+  const colon = raw.lastIndexOf(':');
+  if (colon <= 0) return null;
+  const paramIndex = Number(raw.slice(colon + 1));
+  if (!Number.isInteger(paramIndex) || paramIndex < 0) return null;
+  return { key: raw, name: raw.slice(0, colon), paramIndex };
+}
+
+/** Replace qualifiedNames with a const-aware re-extract. Same node id is kept. */
+export function overlayGoRoutePaths(
+  routes: Node[],
+  files: Array<{ filePath: string; content: string }>,
+  consts: Map<string, string>
+): void {
+  const fresh = new Map<string, Node[]>();
+  for (const file of files) {
+    const extracted = extractGoHttpRoutes(file.filePath, file.content, consts);
+    for (const node of extracted.nodes) {
+      const method = node.name.split(' ')[0] ?? '';
+      const key = `${node.filePath}|${node.startLine}|${method}`;
+      const list = fresh.get(key) ?? [];
+      list.push(node);
+      fresh.set(key, list);
+    }
+  }
+  for (const route of routes) {
+    if (route.language !== 'go' || !route.qualifiedName.includes('::route:')) continue;
+    const method = route.name.split(' ')[0] ?? '';
+    const list = fresh.get(`${route.filePath}|${route.startLine}|${method}`);
+    if (!list || list.length !== 1) continue;
+    const next = list[0]!;
+    if (next.qualifiedName !== route.qualifiedName) route.qualifiedName = next.qualifiedName;
+  }
 }
 
 /** Apply cross-file mux prefixes to route nodes (postExtract). */
@@ -405,8 +716,10 @@ interface ResolvedAssign {
  * and callback form (`m.Group("/repos", func() { ... })`, `r.Route("/api", func(r Router)`)
  * both contribute. A callback parameter shadows the outer name only inside its body.
  */
-function buildGoPrefixIndex(src: string): GoPrefixIndex {
+function buildGoPrefixIndex(src: string, extraConsts?: Map<string, string>): GoPrefixIndex {
   const funcs = collectFuncSpans(src);
+  const consts = mergeGoConsts(src, extraConsts);
+  const imports = parseGoImports(src);
   const scopes: ResolvedScope[] = [];
   const assigns: ResolvedAssign[] = [];
 
@@ -442,16 +755,20 @@ function buildGoPrefixIndex(src: string): GoPrefixIndex {
       };
 
   const events: Event[] = [];
-  const assignRe = /\b(\w+)\s*:?=\s*([\w.]+)\.(?:Group|Route)\(\s*"([^"]*)"/g;
+  const assignRe = /\b(\w+)\s*:?=\s*([\w.]+)\.(?:Group|Route)\s*\(/g;
   let m: RegExpExecArray | null;
   while ((m = assignRe.exec(src)) !== null) {
+    const open = src.indexOf('(', m.index + m[1]!.length);
+    const arg = open >= 0 ? readFirstArg(src, open) : null;
+    const path = arg == null ? null : resolveGoPrefixExpr(arg, consts, imports);
+    if (path === null) continue;
     const fn = enclosingFunc(funcs, m.index);
     events.push({
       kind: 'assign',
       index: m.index,
       child: m[1]!,
       parent: receiverLeafName(m[2]!),
-      path: m[3]!,
+      path,
       funcEnd: fn ? fn.bodyEnd : Number.POSITIVE_INFINITY,
     });
   }
@@ -460,7 +777,7 @@ function buildGoPrefixIndex(src: string): GoPrefixIndex {
   while ((m = scopeRe.exec(src)) !== null) {
     const open = src.indexOf('(', m.index + m[1]!.length);
     if (open < 0) continue;
-    const parsed = parseGroupCallback(src, open);
+    const parsed = parseGroupCallback(src, open, consts, imports);
     if (!parsed) continue;
     const parent = receiverLeafName(m[1]!);
     events.push({
@@ -523,6 +840,7 @@ function enclosingFunc(funcs: GoFuncSpan[], pos: number): GoFuncSpan | null {
 
 interface RouteTemplate {
   funcName: string;
+  paramIndex: number;
   method: string;
   path: string;
   index: number;
@@ -577,7 +895,8 @@ function flushPendingGoRoutes(
     length: number,
     handlerExpr: string,
     muxField: string | null,
-    mountFunc: string | null
+    mountFunc: string | null,
+    groupFn: string | null = null
   ) => {
     const normalized = normalizeGoRoutePath(path);
     const key = `${mountFunc ?? ''}\0${method}\0${normalized}\0${index}`;
@@ -595,6 +914,7 @@ function flushPendingGoRoutes(
       handlerExpr,
       muxField,
       mountFunc,
+      groupFn,
       now
     );
   };
@@ -621,6 +941,7 @@ function flushPendingGoRoutes(
     if (fn && fn.params.includes(leaf)) {
       templates.push({
         funcName: fn.name,
+        paramIndex: fn.params.indexOf(leaf),
         method: route.method,
         path: local,
         index: route.index,
@@ -648,6 +969,7 @@ function flushPendingGoRoutes(
         if (caller && caller.params.includes(template.receiver)) {
           templates.push({
             funcName: caller.name,
+            paramIndex: caller.params.indexOf(template.receiver),
             method: template.method,
             path: full,
             index: template.index,
@@ -751,7 +1073,8 @@ function flushPendingGoRoutes(
       template.length,
       template.handlerExpr,
       template.muxField,
-      template.funcName
+      template.funcName,
+      `${template.funcName}:${template.paramIndex}`
     );
   }
 }
@@ -956,17 +1279,18 @@ function parseParamNames(paramsRaw: string): string[] {
 
 function parseGroupCallback(
   src: string,
-  openParen: number
+  openParen: number,
+  consts: Map<string, string>,
+  imports: Map<string, string>
 ): { pattern: string; paramName: string | null; bodyStart: number; bodyEnd: number } | null {
+  const arg = readFirstArg(src, openParen);
+  const resolved = arg == null ? '' : (resolveGoPrefixExpr(arg, consts, imports) ?? '');
   let i = openParen + 1;
   let depth = 1;
-  let pattern: string | null = null;
   while (i < src.length && depth > 0) {
     const c = src[i]!;
     if (c === '"') {
-      const text = readGoString(src, i);
-      if (depth === 1 && pattern === null) pattern = text.value;
-      i = text.end;
+      i = skipGoString(src, i) + 1;
       continue;
     }
     if (c === '`') {
@@ -981,7 +1305,7 @@ function parseGroupCallback(
       const fn = parseFuncLiteral(src, i);
       if (fn) {
         return {
-          pattern: pattern ?? '',
+          pattern: resolved,
           paramName: fn.paramName,
           bodyStart: fn.bodyStart,
           bodyEnd: fn.bodyEnd,
@@ -1096,13 +1420,15 @@ function addGoRoute(
   handlerExpr: string,
   muxField: string | null,
   mountFunc: string | null,
+  groupFn: string | null,
   now: number
 ): void {
   const displayPath = path === '' ? '/' : path.startsWith('/') ? path : `/${path}`;
   const qn =
     `${filePath}::route:${displayPath}` +
     (muxField ? `${GO_MUX_RECEIVER_MARKER}${muxField}` : '') +
-    (mountFunc ? `${GO_MOUNT_MARKER}${mountFunc}` : '');
+    (mountFunc ? `${GO_MOUNT_MARKER}${mountFunc}` : '') +
+    (groupFn ? `${GO_GROUP_FN_MARKER}${groupFn}` : '');
 
   const routeNode: Node = {
     id: `route:${filePath}:${line}:${method}:${displayPath}`,
@@ -1184,7 +1510,7 @@ function routePathFromQualified(qn: string): string {
   const start = qn.indexOf('::route:');
   if (start < 0) return '/';
   let rest = qn.slice(start + '::route:'.length);
-  for (const marker of [GO_MUX_RECEIVER_MARKER, GO_MOUNT_MARKER]) {
+  for (const marker of [GO_MUX_RECEIVER_MARKER, GO_MOUNT_MARKER, GO_GROUP_FN_MARKER]) {
     const end = rest.indexOf(marker);
     if (end >= 0) rest = rest.slice(0, end);
   }
@@ -1327,7 +1653,8 @@ function matchGo122MethodPattern(routePath: string, rawMethod: string): string |
 export function finalizeGoRouteNames(
   routes: Node[],
   muxPrefixes: Map<string, string>,
-  mounts: Map<string, string>
+  mounts: Map<string, string>,
+  groupFnPrefixes?: Map<string, string>
 ): Node[] {
   const updates: Node[] = [];
   const seen = new Set<string>();
@@ -1349,6 +1676,12 @@ export function finalizeGoRouteNames(
     if (funcName) {
       const prefix = mountPrefixFor(mounts, route.filePath, funcName);
       if (prefix && prefix !== '/') path = joinGoPath(prefix, path);
+    }
+
+    const groupFn = markerValue(route.qualifiedName, GO_GROUP_FN_MARKER);
+    if (groupFn && groupFnPrefixes) {
+      const prefix = groupFnPrefixes.get(groupFn);
+      if (prefix) path = joinGoPath(prefix, path);
     }
 
     const newName = `${method} ${path}`;

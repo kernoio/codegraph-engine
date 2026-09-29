@@ -73,6 +73,10 @@ export const jaxrsResolver: FrameworkResolver = {
 
     return extractFromSafe(filePath, safe, filePath.endsWith('.kt') ? 'kotlin' : 'java');
   },
+
+  postExtract(context: ResolutionContext): Node[] {
+    return applyJaxRsLocatorPrefixes(context);
+  },
 };
 
 function looksLikeJaxRs(content: string): boolean {
@@ -125,7 +129,9 @@ function extractFromSafe(
       id: `route:${filePath}:${line}:${method}:${routePath}`,
       kind: 'route',
       name: `${method} ${routePath}`,
-      qualifiedName: `${filePath}::route:${method}:${routePath}`,
+      qualifiedName: `${filePath}::route:${method}:${routePath}${
+        scope?.className ? `${JAX_CLASS_MARKER}${scope.className}` : ''
+      }`,
       filePath,
       startLine: line,
       endLine: line,
@@ -267,4 +273,160 @@ function scopeFor(scopes: ClassScope[], index: number): ClassScope | null {
 
 function lineAt(safe: string, index: number): number {
   return safe.slice(0, index).split('\n').length;
+}
+
+const JAX_CLASS_MARKER = '::@jaxclass:';
+const NON_RESOURCE_TYPES = new Set([
+  'Response',
+  'String',
+  'Integer',
+  'Object',
+  'Boolean',
+  'Long',
+  'Void',
+  'List',
+  'Set',
+  'Map',
+  'Collection',
+  'Optional',
+  'CompletionStage',
+  'Uni',
+  'Multi',
+]);
+
+interface JaxLocator {
+  owner: string;
+  path: string;
+  ret: string;
+}
+
+/**
+ * Sub-resource locators: a method with @Path and no HTTP verb returns another
+ * resource class. That class usually has no @Path of its own, so its handlers
+ * are mounted at ownerPrefix + locatorPath. The chain is transitive
+ * (AdminRoot -> RealmsAdminResource -> RealmAdminResource -> UsersResource).
+ */
+function applyJaxRsLocatorPrefixes(context: ResolutionContext): Node[] {
+  const ownPath = new Map<string, string>();
+  const ambiguous = new Set<string>();
+  const locators: JaxLocator[] = [];
+
+  for (const filePath of context.getAllFiles()) {
+    if (!JAVA_KT.test(filePath)) continue;
+    const content = context.readFile(filePath);
+    if (!content || !content.includes('@Path')) continue;
+    const safe = stripCommentsForRegex(content, 'java');
+    collectJaxLocators(safe, ownPath, ambiguous, locators);
+  }
+
+  const mount = new Map<string, string>();
+  for (const [name, prefix] of ownPath) {
+    if (prefix && !ambiguous.has(name)) mount.set(name, prefix);
+  }
+  for (let pass = 0; pass < 16; pass++) {
+    let changed = false;
+    for (const loc of locators) {
+      if (ambiguous.has(loc.owner) || ambiguous.has(loc.ret)) continue;
+      if (ownPath.get(loc.ret)) continue;
+      const ownerPrefix = mount.get(loc.owner) ?? '';
+      if (!ownerPrefix) continue;
+      const full = joinPath(ownerPrefix, loc.path);
+      const prev = mount.get(loc.ret);
+      if (prev && prev !== full) {
+        ambiguous.add(loc.ret);
+        mount.delete(loc.ret);
+        continue;
+      }
+      if (prev !== full) {
+        mount.set(loc.ret, full);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+
+  const routes =
+    context.iterateNodesByKind?.('route') != null
+      ? Array.from(context.iterateNodesByKind!('route'))
+      : context.getNodesByKind('route');
+  const updates: Node[] = [];
+  for (const route of routes) {
+    if (route.language !== 'java' && route.language !== 'kotlin') continue;
+    const parsed = parseJaxRoute(route.qualifiedName);
+    if (!parsed) continue;
+    if (ownPath.get(parsed.className)) continue;
+    if (ambiguous.has(parsed.className)) continue;
+    const prefix = mount.get(parsed.className);
+    if (!prefix) continue;
+    const path = joinPath(prefix, parsed.path);
+    const newName = `${parsed.method} ${path}`;
+    if (newName === route.name) continue;
+    updates.push({ ...route, name: newName });
+  }
+  return updates;
+}
+
+function collectJaxLocators(
+  safe: string,
+  ownPath: Map<string, string>,
+  ambiguous: Set<string>,
+  locators: JaxLocator[]
+): void {
+  const scopes = buildClassScopes(safe);
+  for (const scope of scopes) {
+    const prev = ownPath.get(scope.className);
+    if (prev !== undefined && prev !== scope.prefix) ambiguous.add(scope.className);
+    else if (prev === undefined) ownPath.set(scope.className, scope.prefix);
+
+    const body = safe.slice(scope.start, scope.end);
+    const sigRe = /\b(?:public|protected|private)\s+([A-Z]\w*)\s+(\w+)\s*\(/g;
+    let m: RegExpExecArray | null;
+    while ((m = sigRe.exec(body)) !== null) {
+      const ret = m[1]!;
+      if (NON_RESOURCE_TYPES.has(ret)) continue;
+      const abs = scope.start + m.index;
+      const region = annotationsBefore(safe, abs, scope.start);
+      if (!/@Path\b/.test(region)) continue;
+      if (/@(?:GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b/.test(region)) continue;
+      const pathMatch = region.match(/@Path\s*\(([^)]*)\)/);
+      if (!pathMatch) continue;
+      const path = parsePathArg(pathMatch[1]!);
+      if (!path) continue;
+      locators.push({ owner: scope.className, path, ret });
+    }
+  }
+}
+
+function annotationsBefore(src: string, index: number, floor: number): string {
+  let i = index - 1;
+  while (i > floor) {
+    const c = src[i]!;
+    if (c === '"' || c === '\'') {
+      const quote = c;
+      i--;
+      while (i > floor && src[i] !== quote && src[i] !== '\n') i--;
+      i--;
+      continue;
+    }
+    if (c === '}' || c === ';') return src.slice(i + 1, index);
+    i--;
+  }
+  return src.slice(floor, index);
+}
+
+function parseJaxRoute(
+  qualifiedName: string
+): { method: string; path: string; className: string } | null {
+  const start = qualifiedName.indexOf('::route:');
+  if (start < 0) return null;
+  let rest = qualifiedName.slice(start + '::route:'.length);
+  const classAt = rest.indexOf(JAX_CLASS_MARKER);
+  let className = '';
+  if (classAt >= 0) {
+    className = rest.slice(classAt + JAX_CLASS_MARKER.length);
+    rest = rest.slice(0, classAt);
+  }
+  const methodEnd = rest.indexOf(':');
+  if (methodEnd < 0 || !className) return null;
+  return { method: rest.slice(0, methodEnd), path: rest.slice(methodEnd + 1), className };
 }

@@ -1,0 +1,12 @@
+{
+  "framework": "go-http",
+  "source": "apache/answer + cloudreve — computed Gin Group prefixes, cross-file consts, and router parameters",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /answer/api/v1/siteinfo",
+    "GET /answer/api/v1/user/info",
+    "GET /api/v1/admin/stats",
+    "GET /api/v1/users",
+    "GET /api/v4/site"
+  ]
+}

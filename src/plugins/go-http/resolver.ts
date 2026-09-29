@@ -14,10 +14,15 @@ import {
   ResolutionContext,
 } from '../../resolution/types';
 import {
+  collectGoGroupFnPrefixes,
   collectGoMountPrefixes,
+  collectGoStringConsts,
   collectMuxRoutePrefixes,
   extractGoHttpRoutes,
   finalizeGoRouteNames,
+  overlayGoRoutePaths,
+  preferMuxPrefix,
+  readGoGroupFn,
 } from './mux-routes';
 
 const HANDLER_DIRS = ['handler', 'handlers', 'api', 'routes', 'controller', 'controllers'];
@@ -81,7 +86,6 @@ export const goHttpResolver: FrameworkResolver = {
   },
 
   postExtract(context: ResolutionContext): Node[] {
-    const prefixByField = new Map<string, string>();
     const goFiles: Array<{ filePath: string; content: string }> = [];
 
     for (const filePath of context.getAllFiles()) {
@@ -89,8 +93,12 @@ export const goHttpResolver: FrameworkResolver = {
       const content = context.readFile(filePath);
       if (!content) continue;
       goFiles.push({ filePath, content });
-      for (const [field, prefix] of collectMuxRoutePrefixes(content)) {
-        prefixByField.set(field, prefix);
+    }
+
+    const consts = new Map<string, string>();
+    for (const file of goFiles) {
+      for (const [key, value] of collectGoStringConsts(file.content)) {
+        if (!consts.has(key)) consts.set(key, value);
       }
     }
 
@@ -98,10 +106,38 @@ export const goHttpResolver: FrameworkResolver = {
       context.iterateNodesByKind?.('route') != null
         ? Array.from(context.iterateNodesByKind!('route'))
         : context.getNodesByKind('route');
+    const working = routes.map((route) => ({ ...route }));
+    overlayGoRoutePaths(working, goFiles, consts);
+
+    const wanted = new Map<string, { name: string; paramIndex: number }>();
+    for (const route of working) {
+      const groupFn = readGoGroupFn(route.qualifiedName);
+      if (groupFn) wanted.set(groupFn.key, { name: groupFn.name, paramIndex: groupFn.paramIndex });
+    }
+    const groupFnPrefixes = collectGoGroupFnPrefixes(goFiles, wanted, consts);
+
+    const prefixByField = new Map<string, string>();
+    for (const file of goFiles) {
+      for (const [field, prefix] of collectMuxRoutePrefixes(file.content, consts)) {
+        prefixByField.set(field, preferMuxPrefix(prefixByField.get(field), prefix));
+      }
+    }
 
     const modulePath = readGoModulePath(context.readFile('go.mod'));
     const mounts = collectGoMountPrefixes(goFiles, modulePath);
-    return finalizeGoRouteNames(routes, prefixByField, mounts);
+    const finalized = finalizeGoRouteNames(working, prefixByField, mounts, groupFnPrefixes);
+    const byId = new Map(working.map((route) => [route.id, route]));
+    for (const update of finalized) byId.set(update.id, update);
+
+    const originals = new Map(routes.map((route) => [route.id, route]));
+    const updates: Node[] = [];
+    for (const [id, next] of byId) {
+      const original = originals.get(id);
+      if (!original) continue;
+      if (next.name === original.name && next.qualifiedName === original.qualifiedName) continue;
+      updates.push({ ...original, name: next.name, qualifiedName: next.qualifiedName });
+    }
+    return updates;
   },
 };
 

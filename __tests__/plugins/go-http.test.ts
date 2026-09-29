@@ -51,14 +51,14 @@ describe('go-http plugin (framework: gorilla/mux + Gin + Chi + Fiber)', () => {
       MATTERMOST_USER_ROUTE_REGISTRATIONS
     );
     const prefixByField = collectMuxRoutePrefixes(MATTERMOST_API_ROUTES_STRUCT);
-    expect(prefixByField.get('Users')).toBe('/users');
-    expect(prefixByField.get('User')).toBe('/users/{user_id:[A-Za-z0-9]+}');
+    expect(prefixByField.get('Users')).toBe('/api/v4/users');
+    expect(prefixByField.get('User')).toBe('/api/v4/users/{user_id:[A-Za-z0-9]+}');
 
     const updated = applyMuxRoutePrefixes(extracted.nodes, prefixByField);
     expect(updated.map((n) => n.name).sort()).toEqual([
-      'GET /users/{user_id:[A-Za-z0-9]+}',
-      'POST /users',
-      'POST /users/ids',
+      'GET /api/v4/users/{user_id:[A-Za-z0-9]+}',
+      'POST /api/v4/users',
+      'POST /api/v4/users/ids',
     ]);
   });
 
@@ -308,7 +308,112 @@ describe('go-http postExtract integration', () => {
 
     const updates = goHttpResolver.postExtract!(ctx as never);
     expect(updates.length).toBeGreaterThan(0);
-    expect(updates.some((n: Node) => n.name.startsWith('POST /users'))).toBe(true);
+    expect(updates.some((n: Node) => n.name.startsWith('POST /api/v4/users'))).toBe(true);
+  });
+
+  it('composes mux PathPrefix chains when no struct comment documents the field', () => {
+    const src = `
+package api
+
+const APIURLSuffix = "/api/v4"
+
+func Init() {
+	api.BaseRoutes.APIRoot = srv.Router.PathPrefix(APIURLSuffix).Subrouter()
+	api.BaseRoutes.Users = api.BaseRoutes.APIRoot.PathPrefix("/users").Subrouter()
+	api.BaseRoutes.User = api.BaseRoutes.Users.PathPrefix("/{user_id}").Subrouter()
+}
+`;
+    const prefixes = collectMuxRoutePrefixes(src);
+    expect(prefixes.get('APIRoot')).toBe('/api/v4');
+    expect(prefixes.get('Users')).toBe('/api/v4/users');
+    expect(prefixes.get('User')).toBe('/api/v4/users/{user_id}');
+  });
+
+  it('keeps the literal half of a computed Gin group prefix', () => {
+    const src = `
+func setup(r *gin.Engine, base string) {
+	v1 := r.Group(base + "/api/v1")
+	v1.GET("/users", listUsers)
+	admin := v1.Group("/admin")
+	admin.GET("/stats", stats)
+}
+`;
+    const result = goHttpResolver.extract!('router.go', src);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /api/v1/admin/stats',
+      'GET /api/v1/users',
+    ]);
+  });
+
+  it('resolves a group prefix from a const in another file and from the call site', () => {
+    const constants = `
+package constants
+
+const APIPrefix = "/api/v4"
+`;
+    const router = `
+package routers
+
+import "example.com/app/application/constants"
+
+func Init(r *gin.Engine) {
+	v4 := r.Group(constants.APIPrefix)
+	v4.GET("/site", siteInfo)
+	auth := r.Group("/answer/api/v1")
+	register(auth)
+}
+
+func register(r *gin.RouterGroup) {
+	r.GET("/user/info", userInfo)
+}
+`;
+    const other = `
+package router
+
+func RegisterAnswerAPIRouter(r *gin.RouterGroup) {
+	r.GET("/siteinfo", getSiteInfo)
+}
+`;
+    const http = `
+package server
+
+func routes(r *gin.Engine) {
+	authV1 := r.Group(uiConf.APIBaseURL + "/answer/api/v1")
+	answerRouter.RegisterAnswerAPIRouter(authV1)
+}
+`;
+    const extracted = [
+      ...extractGoHttpRoutes('routers/router.go', router).nodes,
+      ...extractGoHttpRoutes('router/api.go', other).nodes,
+    ];
+    const ctx = {
+      getAllFiles: () => [
+        'go.mod',
+        'application/constants/constants.go',
+        'routers/router.go',
+        'router/api.go',
+        'server/http.go',
+      ],
+      readFile: (f: string) => {
+        if (f === 'go.mod') return 'module example.com/app\n';
+        if (f === 'application/constants/constants.go') return constants;
+        if (f === 'routers/router.go') return router;
+        if (f === 'router/api.go') return other;
+        if (f === 'server/http.go') return http;
+        return null;
+      },
+      iterateNodesByKind: function* (kind: string) {
+        if (kind === 'route') yield* extracted;
+      },
+    };
+    const updates = goHttpResolver.postExtract!(ctx as never);
+    const names = new Map(extracted.map((n) => [n.id, n.name]));
+    for (const update of updates) names.set(update.id, update.name);
+    expect([...names.values()].sort()).toEqual([
+      'GET /answer/api/v1/siteinfo',
+      'GET /answer/api/v1/user/info',
+      'GET /api/v4/site',
+    ]);
   });
 
   it('leaves GoFrame g.Meta routes alone when composing mux and Mount prefixes', () => {
