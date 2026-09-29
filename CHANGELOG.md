@@ -14,6 +14,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
+- Go route groups now keep every enclosing prefix. A route registered inside nested `Group` or `Route` callbacks — including when the callback reuses the same router, a helper or closure the group calls, and a `Mount` of that router — is recorded as the path the server actually serves, instead of only the innermost segment.
 - Next.js Pages Router API routes now record the HTTP methods they handle (`GET`, `POST`, …) instead of an empty catch-all, so they count as endpoints the same way App Router `route.ts` handlers do.
 - Django `include()` prefixes now compose onto nested routes: a view inside `re_path(..., include([...]))` or an included `urls.py` keeps the outer path, and a Django REST framework `router.register` mounted with `include(router.urls)` keeps the mount prefix.
 - Django REST framework viewsets that inherit from a project-defined base — classes not named `*View` or `*ViewSet` — are now detected when registered on a router.

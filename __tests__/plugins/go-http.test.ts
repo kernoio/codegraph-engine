@@ -10,6 +10,7 @@ import {
   collectGroupVarPrefixes,
   collectMuxRoutePrefixes,
   extractGoHttpRoutes,
+  finalizeGoRouteNames,
 } from '../../src/plugins/go-http/mux-routes';
 import { goResolver } from '../../src/resolution/frameworks/go';
 import {
@@ -20,6 +21,9 @@ import {
   FIBER_AUTH_JWT_ROUTES,
   FIBER_BOILERPLATE_APP,
   FIBER_ROUTE_CALLBACK_AND_ADD,
+  GITEA_API_MOUNT,
+  GITEA_NESTED_GROUP_ROUTES,
+  CHI_NESTED_ROUTE_CALLBACKS,
 } from './fixtures';
 import type { Node } from '../../src/types';
 
@@ -151,6 +155,125 @@ describe('go-http plugin (framework: gorilla/mux + Gin + Chi + Fiber)', () => {
     ).toBe(false);
   });
 
+  it('keeps nested Gitea Group prefixes, Combo methods, helpers, and regexp params', () => {
+    const result = goHttpResolver.extract!(
+      'routers/api/v1/api.go',
+      GITEA_NESTED_GROUP_ROUTES
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'DELETE /repos/{username}/{reponame}',
+      'GET /licenses',
+      'GET /orgs/{org}/projects',
+      'GET /orgs/{org}/projects/{id}',
+      'GET /orgs/{org}/projects/{id}/columns',
+      'GET /repos/search',
+      'GET /repos/{username}/{reponame}',
+      'GET /repos/{username}/{reponame}/actions/artifacts/{artifact_id}/zip/raw',
+      'GET /repos/{username}/{reponame}/{ball_type:tarball|zipball|bundle}/*',
+      'GET /user/projects',
+      'GET /user/projects/{id}',
+      'GET /user/projects/{id}/columns',
+      'GET /version',
+      'HEAD /repos/{username}/{reponame}/{ball_type:tarball|zipball|bundle}/*',
+      'PATCH /repos/{username}/{reponame}',
+      'POST /repos/{username}/{reponame}/transfer/accept',
+      'POST /repos/{username}/{reponame}/transfer/reject',
+    ]);
+    expect(result.references.map((r) => r.referenceName)).toContain('AcceptTransfer');
+    expect(result.references.map((r) => r.referenceName)).toContain('Get');
+  });
+
+  it('applies a cross-file Mount prefix onto the mounted router function', () => {
+    const extracted = extractGoHttpRoutes('routers/api/v1/api.go', GITEA_NESTED_GROUP_ROUTES);
+    const ctx = {
+      getAllFiles: () => ['go.mod', 'routers/init.go', 'routers/api/v1/api.go'],
+      readFile: (f: string) => {
+        if (f === 'go.mod') return 'module example.com/gitea\n\ngo 1.22\n';
+        if (f === 'routers/init.go') return GITEA_API_MOUNT;
+        if (f === 'routers/api/v1/api.go') return GITEA_NESTED_GROUP_ROUTES;
+        return null;
+      },
+      iterateNodesByKind: function* (kind: string) {
+        if (kind === 'route') yield* extracted.nodes;
+      },
+    };
+    const updates = goHttpResolver.postExtract!(ctx as never);
+    const names = new Map(extracted.nodes.map((n) => [n.id, n.name]));
+    for (const update of updates) names.set(update.id, update.name);
+    expect([...names.values()].sort()).toEqual([
+      'DELETE /api/v1/repos/{username}/{reponame}',
+      'GET /api/v1/licenses',
+      'GET /api/v1/orgs/{org}/projects',
+      'GET /api/v1/orgs/{org}/projects/{id}',
+      'GET /api/v1/orgs/{org}/projects/{id}/columns',
+      'GET /api/v1/repos/search',
+      'GET /api/v1/repos/{username}/{reponame}',
+      'GET /api/v1/repos/{username}/{reponame}/actions/artifacts/{artifact_id}/zip/raw',
+      'GET /api/v1/repos/{username}/{reponame}/{ball_type:tarball|zipball|bundle}/*',
+      'GET /api/v1/user/projects',
+      'GET /api/v1/user/projects/{id}',
+      'GET /api/v1/user/projects/{id}/columns',
+      'GET /api/v1/version',
+      'HEAD /api/v1/repos/{username}/{reponame}/{ball_type:tarball|zipball|bundle}/*',
+      'PATCH /api/v1/repos/{username}/{reponame}',
+      'POST /api/v1/repos/{username}/{reponame}/transfer/accept',
+      'POST /api/v1/repos/{username}/{reponame}/transfer/reject',
+    ]);
+  });
+
+  it('keeps chi Route prefixes when the callback parameter shadows the parent', () => {
+    const result = goHttpResolver.extract!('routes.go', CHI_NESTED_ROUTE_CALLBACKS);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /api/health',
+      'GET /api/ping',
+      'GET /api/v1/users',
+      'GET /public',
+    ]);
+  });
+
+  it('applies the call-site group prefix to a closure that closes over the router', () => {
+    const src = `
+func register(m *web.Router) {
+	addSecrets := func() {
+		m.Group("/secrets", func() {
+			m.Get("", listSecrets)
+			m.Post("", createSecret)
+		})
+	}
+	m.Group("/user/settings", func() {
+		m.Group("/actions", func() {
+			addSecrets()
+		})
+	})
+	m.Group("/repo/settings", func() {
+		addSecrets()
+	})
+}
+`;
+    const result = goHttpResolver.extract!('web.go', src);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /repo/settings/secrets',
+      'GET /user/settings/actions/secrets',
+      'POST /repo/settings/secrets',
+      'POST /user/settings/actions/secrets',
+    ]);
+  });
+
+  it('does not let one function\'s Group variable overwrite another\'s', () => {
+    const src = `
+func a(app *gin.Engine) {
+	r := app.Group("/a")
+	r.GET("/x", ax)
+}
+func b(app *gin.Engine) {
+	r := app.Group("/b")
+	r.GET("/y", by)
+}
+`;
+    const result = goHttpResolver.extract!('routes.go', src);
+    expect(result.nodes.map((n) => n.name).sort()).toEqual(['GET /a/x', 'GET /b/y']);
+  });
+
   it('does NOT treat verb-named non-path calls as routes (#1259)', () => {
     const src = [
       `c.Put("a", 1)`,
@@ -186,5 +309,22 @@ describe('go-http postExtract integration', () => {
     const updates = goHttpResolver.postExtract!(ctx as never);
     expect(updates.length).toBeGreaterThan(0);
     expect(updates.some((n: Node) => n.name.startsWith('POST /users'))).toBe(true);
+  });
+
+  it('leaves GoFrame g.Meta routes alone when composing mux and Mount prefixes', () => {
+    const foreign: Node = {
+      id: 'route:api/system/dept.go:6:GET:/dept/list',
+      kind: 'route',
+      name: 'GET /dept/list',
+      qualifiedName: 'api/system/dept.go::goframe-route:system.DeptSearchReq',
+      filePath: 'api/system/dept.go',
+      startLine: 6,
+      endLine: 6,
+      startColumn: 0,
+      endColumn: 10,
+      language: 'go',
+      updatedAt: 0,
+    };
+    expect(finalizeGoRouteNames([foreign], new Map([['Users', '/api/v4']]), new Map())).toEqual([]);
   });
 });

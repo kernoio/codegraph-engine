@@ -14,9 +14,10 @@ import {
   ResolutionContext,
 } from '../../resolution/types';
 import {
-  applyMuxRoutePrefixes,
+  collectGoMountPrefixes,
   collectMuxRoutePrefixes,
   extractGoHttpRoutes,
+  finalizeGoRouteNames,
 } from './mux-routes';
 
 const HANDLER_DIRS = ['handler', 'handlers', 'api', 'routes', 'controller', 'controllers'];
@@ -81,11 +82,13 @@ export const goHttpResolver: FrameworkResolver = {
 
   postExtract(context: ResolutionContext): Node[] {
     const prefixByField = new Map<string, string>();
+    const goFiles: Array<{ filePath: string; content: string }> = [];
 
     for (const filePath of context.getAllFiles()) {
       if (!filePath.endsWith('.go')) continue;
       const content = context.readFile(filePath);
       if (!content) continue;
+      goFiles.push({ filePath, content });
       for (const [field, prefix] of collectMuxRoutePrefixes(content)) {
         prefixByField.set(field, prefix);
       }
@@ -96,9 +99,17 @@ export const goHttpResolver: FrameworkResolver = {
         ? Array.from(context.iterateNodesByKind!('route'))
         : context.getNodesByKind('route');
 
-    return applyMuxRoutePrefixes(routes, prefixByField);
+    const modulePath = readGoModulePath(context.readFile('go.mod'));
+    const mounts = collectGoMountPrefixes(goFiles, modulePath);
+    return finalizeGoRouteNames(routes, prefixByField, mounts);
   },
 };
+
+function readGoModulePath(goMod: string | null): string | null {
+  if (!goMod) return null;
+  const match = goMod.match(/^\s*module\s+(\S+)/m);
+  return match ? match[1]! : null;
+}
 
 function resolveByNameAndKind(
   name: string,
