@@ -60,6 +60,7 @@ import pyramidPlugin, { pyramidResolver } from './pyramid';
 import bottlePlugin, { bottleResolver } from './bottle';
 import falconPlugin, { falconResolver } from './falcon';
 import djangoPlugin, { djangoResolver } from './django';
+import railsPlugin, { railsResolver } from './rails';
 
 const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   tsoaPlugin,
@@ -92,6 +93,7 @@ const BUILTIN_PLUGINS: CodeGraphPlugin[] = [
   bottlePlugin,
   falconPlugin,
   djangoPlugin,
+  railsPlugin,
 ];
 
 export function getBuiltInPlugins(): CodeGraphPlugin[] {
@@ -133,4 +135,5 @@ export {
   bottleResolver,
   falconResolver,
   djangoResolver,
+  railsResolver,
 };

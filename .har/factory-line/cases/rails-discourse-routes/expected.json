@@ -1,0 +1,20 @@
+{
+  "framework": "rails",
+  "source": "discourse/discourse config/routes.rb @ badad7b — only:/path:/scope/namespace",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /session/:id",
+    "GET /admin",
+    "GET /admin/users",
+    "GET /admin/users/list",
+    "GET /topics/created-by/:username",
+    "GET /u",
+    "GET /u/trusted-session",
+    "GET /users",
+    "GET /users/trusted-session",
+    "POST /session",
+    "POST /u",
+    "POST /users",
+    "PUT /admin/users/:user_id/suspend"
+  ]
+}

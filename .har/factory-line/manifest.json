@@ -46,7 +46,8 @@
     "pyramid-benchmarker",
     "bottle-crud",
     "falcon-things",
-    "falcon-asgilook"
+    "falcon-asgilook",
+    "rails-discourse-routes"
   ],
   "repos": [
     {
