@@ -1,0 +1,9 @@
+{
+  "framework": "nestjs",
+  "source": "BE-3364 — n8n decorator routes declared only inside unit-test fixtures",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /users",
+    "POST /users"
+  ]
+}

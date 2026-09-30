@@ -352,6 +352,47 @@ export function isTestPath(filePath: string): boolean {
 }
 
 /**
+ * A file whose declarations belong to a test suite, not to a path the server serves.
+ *
+ * Narrower than {@link isTestPath}. That helper also flags a directory or file
+ * literally named `test` (`app/test/page.tsx`, `pages/test.tsx`, `src/routes/test.ts`),
+ * which is a real route whose URL happens to be `/test`. Route collection uses
+ * this predicate so fixture controllers under `__tests__/` and `*.test.ts` never
+ * become endpoints, while that URL segment still does.
+ */
+export function isTestSuiteFile(filePath: string): boolean {
+  const normalized = filePath.replace(/\\/g, '/');
+  const lower = normalized.toLowerCase();
+  const fileName = path.posix.basename(normalized);
+  const lowerName = fileName.toLowerCase();
+
+  // Filename conventions shared with isTestPath, except a file literally named
+  // `test.ts` / `test.py` — that name is also a route module.
+  if (
+    lowerName.startsWith('test_') || // python: test_foo.py
+    /[._-](test|tests|spec|specs)\.[a-z0-9]+$/.test(lowerName) || // foo.test.ts, foo_test.go
+    /(?:Test|Tests|TestCase|Tester|Spec|Specs)\.[A-Za-z0-9]+$/.test(fileName) ||
+    lowerName === 'conftest.py'
+  ) {
+    return true;
+  }
+
+  // Suite directories. A singular `test/` segment is only the JVM/Go/Rust
+  // source set `src/test/`, not an arbitrary URL segment.
+  if (
+    /(?:^|\/)__tests__\//.test(lower) ||
+    /(?:^|\/)__mocks__\//.test(lower) ||
+    /(?:^|\/)(?:tests|specs|spec|e2e|testdata)(?:\/|$)/.test(lower) ||
+    /(?:^|\/)src\/test\//.test(lower) ||
+    /(?:^|\/)[A-Za-z0-9]*(?:Test|Tests|Spec)\//.test(normalized)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Check if a path is in a non-production directory (integration, sample, example, etc.)
  * Handles both absolute paths (/foo/integration/bar) and relative paths (integration/bar).
  */

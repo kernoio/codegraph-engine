@@ -14,6 +14,7 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
+- Endpoint lists no longer include routes that exist only in test files (`__tests__/`, `*.test.ts`, `*_test.go`, and the same conventions in other languages), so coverage is not spent on fixture controllers the running server never serves. Re-index to drop them.
 - Rails routes now keep the path the app actually serves. `only:` and `except:` written as `%i[...]` (or a single symbol) no longer grow the other REST actions, a `path:` option is used instead of the resource name, and `scope` / `namespace` prefixes are composed onto the routes inside them. A `#{name}` segment is filled in when `name` is a literal list in the routes file, and left out when it is not, so a missing binding is not recorded as a path that contains `#{...}`.
 - gorilla/mux routes now keep the path written on the router field (`Users *mux.Router // 'api/v4/users'`). A shorter `PathPrefix` assignment no longer replaces that path, and a chain of `PathPrefix` calls still composes when the field has no comment.
 - Gin group prefixes written as a concatenation or a string constant (`base + "/api/v1"`, `constants.APIPrefix`) now keep that literal path, including when the routes are registered in a function the group is passed into.

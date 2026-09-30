@@ -36,6 +36,7 @@ import {
   getAllFrameworkResolvers,
   getApplicableFrameworks,
 } from '../resolution/frameworks';
+import { isTestSuiteFile } from '../search/query-utils';
 
 // Re-export for backward compatibility
 export { generateNodeId } from './tree-sitter-helpers';
@@ -7231,8 +7232,13 @@ export function extractFromSource(
       if (!fw.extract) continue;
       try {
         const fwResult = fw.extract(filePath, source);
-        result.nodes.push(...fwResult.nodes);
-        result.unresolvedReferences.push(...fwResult.references);
+        // Decorator routes in unit-test fixtures (NestJS controllers under
+        // `__tests__/`, `*.test.ts`, `*_test.go`, …) are not endpoints the
+        // server serves. Drop the route nodes and the handler links that
+        // point at them; other framework symbols in the file stay.
+        const kept = isTestSuiteFile(filePath) ? withoutTestSuiteRoutes(fwResult) : fwResult;
+        result.nodes.push(...kept.nodes);
+        result.unresolvedReferences.push(...kept.references);
       } catch (err) {
         result.errors.push({
           message: `Framework extractor '${fw.name}' failed: ${
@@ -7246,4 +7252,22 @@ export function extractFromSource(
   }
 
   return result;
+}
+
+/** Route nodes declared in a test suite, and the handler refs that hang off them. */
+function withoutTestSuiteRoutes<T extends { nodes: Node[]; references: Array<{ fromNodeId: string }> }>(
+  extracted: T,
+): T {
+  const dropped = new Set<string>();
+  const nodes: Node[] = [];
+  for (const node of extracted.nodes) {
+    if (node.kind === 'route') dropped.add(node.id);
+    else nodes.push(node);
+  }
+  if (dropped.size === 0) return extracted;
+  return {
+    ...extracted,
+    nodes,
+    references: extracted.references.filter((ref) => !dropped.has(ref.fromNodeId)),
+  };
 }
