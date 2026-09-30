@@ -14,6 +14,10 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
+- gorilla/mux routes now keep the path written on the router field (`Users *mux.Router // 'api/v4/users'`). A shorter `PathPrefix` assignment no longer replaces that path, and a chain of `PathPrefix` calls still composes when the field has no comment.
+- Gin group prefixes written as a concatenation or a string constant (`base + "/api/v1"`, `constants.APIPrefix`) now keep that literal path, including when the routes are registered in a function the group is passed into.
+- JAX-RS methods that return another resource (`@Path` with no HTTP verb) are now followed, so handlers on the returned class keep the parent path.
+- Go route groups now keep every enclosing prefix. A route registered inside nested `Group` or `Route` callbacks — including when the callback reuses the same router, a helper or closure the group calls, and a `Mount` of that router — is recorded as the path the server actually serves, instead of only the innermost segment.
 - Next.js Pages Router API routes now record the HTTP methods they handle (`GET`, `POST`, …) instead of an empty catch-all, so they count as endpoints the same way App Router `route.ts` handlers do.
 - Django `include()` prefixes now compose onto nested routes: a view inside `re_path(..., include([...]))` or an included `urls.py` keeps the outer path, and a Django REST framework `router.register` mounted with `include(router.urls)` keeps the mount prefix.
 - Django REST framework viewsets that inherit from a project-defined base — classes not named `*View` or `*ViewSet` — are now detected when registered on a router.

@@ -1,0 +1,24 @@
+{
+  "framework": "go-http",
+  "source": "go-gitea/gitea — routers/api/v1/api.go + routers/init.go @ 812191c",
+  "endpointScope": "http-handler",
+  "routes": [
+    "DELETE /api/v1/repos/{username}/{reponame}",
+    "GET /api/v1/licenses",
+    "GET /api/v1/orgs/{org}/projects",
+    "GET /api/v1/orgs/{org}/projects/{id}",
+    "GET /api/v1/orgs/{org}/projects/{id}/columns",
+    "GET /api/v1/repos/search",
+    "GET /api/v1/repos/{username}/{reponame}",
+    "GET /api/v1/repos/{username}/{reponame}/actions/artifacts/{artifact_id}/zip/raw",
+    "GET /api/v1/repos/{username}/{reponame}/{ball_type:tarball|zipball|bundle}/*",
+    "GET /api/v1/user/projects",
+    "GET /api/v1/user/projects/{id}",
+    "GET /api/v1/user/projects/{id}/columns",
+    "GET /api/v1/version",
+    "HEAD /api/v1/repos/{username}/{reponame}/{ball_type:tarball|zipball|bundle}/*",
+    "PATCH /api/v1/repos/{username}/{reponame}",
+    "POST /api/v1/repos/{username}/{reponame}/transfer/accept",
+    "POST /api/v1/repos/{username}/{reponame}/transfer/reject"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "framework": "jaxrs",
+  "source": "keycloak/keycloak — AdminRoot sub-resource locators (ec4fea99)",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /admin/realms/{realm}/users",
+    "GET /admin/realms/{realm}/users/count",
+    "GET /admin/realms/{realm}/users/{user-id}",
+    "POST /admin/realms",
+    "POST /admin/realms/{realm}/users"
+  ]
+}

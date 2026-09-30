@@ -362,6 +362,96 @@ func main() {
 }
 `;
 
+/**
+ * https://github.com/go-gitea/gitea/blob/812191c0f9283ecf469b1655a7c31c2f86dccf20/routers/api/v1/api.go
+ * Nested `m.Group(pattern, func() { ... })` reuses one router. Combo shares a pattern.
+ * addProjectRoutes is called from inside a group and must inherit that prefix.
+ */
+export const GITEA_NESTED_GROUP_ROUTES = `
+package v1
+
+func Routes() *web.Router {
+	m := web.NewRouter()
+
+	m.Group("", func() {
+		m.Get("/version", misc.Version)
+		m.Get("/licenses", misc.ListLicenseTemplates)
+	})
+
+	m.Group("/repos", func() {
+		m.Get("/search", repo.Search)
+		m.Group("/{username}/{reponame}", func() {
+			m.Combo("").Get(reqAnyRepoReader(), repo.Get).
+				Delete(repo.Delete).
+				Patch(repo.Edit)
+			m.Group("/transfer", func() {
+				m.Post("/accept", repo.AcceptTransfer)
+				m.Post("/reject", repo.RejectTransfer)
+			})
+			m.Methods("HEAD,GET", "/{ball_type:tarball|zipball|bundle}/*", repo.DownloadArchive)
+		})
+	})
+
+	m.Group("/user", func() {
+		m.Group("/projects", func() {
+			addProjectRoutes(m)
+		})
+	})
+
+	m.Group("/orgs/{org}", func() {
+		m.Group("/projects", func() {
+			addProjectRoutes(m)
+		})
+	})
+
+	m.Get("/repos/{username}/{reponame}/actions/artifacts/{artifact_id}/zip/raw", repo.DownloadArtifactRaw)
+	return m
+}
+
+func addProjectRoutes(m *web.Router) {
+	m.Get("", shared.ListProjects)
+	m.Group("/{id}", func() {
+		m.Get("", shared.GetProject)
+		m.Get("/columns", shared.ListProjectColumns)
+	})
+}
+`;
+
+/** https://github.com/go-gitea/gitea/blob/812191c0f9283ecf469b1655a7c31c2f86dccf20/routers/init.go */
+export const GITEA_API_MOUNT = `
+package routers
+
+import (
+	apiv1 "example.com/gitea/routers/api/v1"
+)
+
+func NormalRoutes() *web.Router {
+	r := web.NewRouter()
+	r.Mount("/api/v1", apiv1.Routes())
+	r.Mount("/", web_routers.Routes())
+	return r
+}
+`;
+
+/**
+ * https://github.com/go-chi/chi — Route/Group callbacks. The router parameter
+ * is shadowed at each level; only the enclosing patterns apply.
+ */
+export const CHI_NESTED_ROUTE_CALLBACKS = `
+func Routes(r chi.Router) {
+	r.Route("/api", func(r chi.Router) {
+		r.Get("/health", health)
+		r.Route("/v1", func(r chi.Router) {
+			r.Get("/users", listUsers)
+		})
+		r.Get("/ping", ping)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get("/public", publicIndex)
+	})
+}
+`;
+
 /** Fiber docs — Route callback + Add multi-method (https://docs.gofiber.io/guide/routing/) */
 export const FIBER_ROUTE_CALLBACK_AND_ADD = `
 func main() {

@@ -1,0 +1,11 @@
+{
+  "framework": "go-http",
+  "source": "mattermost/mattermost — server/channels/api4 Routes struct comments vs PathPrefix assignments",
+  "endpointScope": "http-handler",
+  "routes": [
+    "GET /api/v4/teams",
+    "GET /api/v4/users/{user_id:[A-Za-z0-9]+}",
+    "POST /api/v4/users",
+    "POST /api/v4/users/ids"
+  ]
+}

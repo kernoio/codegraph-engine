@@ -1972,6 +1972,89 @@ describe('jaxrs plugin (framework: JAX-RS / Quarkus / Jersey / Dropwizard)', () 
     };
     expect(jaxrsResolver.detect!(negative as any)).toBe(false);
   });
+
+  it('follows sub-resource locators across classes with no class-level @Path', () => {
+    const admin = `
+package admin;
+import jakarta.ws.rs.Path;
+@Path("/admin")
+public class AdminRoot {
+    @Path("realms")
+    public RealmsAdminResource getRealmsAdmin() { return new RealmsAdminResource(); }
+}
+`;
+    const realms = `
+package admin;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+public class RealmsAdminResource {
+    @POST
+    public Response importRealm() { return null; }
+    @Path("{realm}")
+    public RealmAdminResource getRealmAdmin() { return new RealmAdminResource(); }
+}
+`;
+    const realm = `
+package admin;
+import jakarta.ws.rs.Path;
+public class RealmAdminResource {
+    @Path("users")
+    public UsersResource users() { return new UsersResource(); }
+}
+`;
+    const users = `
+package admin;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+public class UsersResource {
+    @POST
+    public Response createUser() { return null; }
+    @GET
+    public Response getUsers() { return null; }
+    @Path("{user-id}")
+    public UserResource user() { return new UserResource(); }
+    @Path("count")
+    @GET
+    public Response count() { return null; }
+}
+`;
+    const user = `
+package admin;
+import jakarta.ws.rs.GET;
+public class UserResource {
+    @GET
+    public Response get() { return null; }
+}
+`;
+    const files: Record<string, string> = {
+      'AdminRoot.java': admin,
+      'RealmsAdminResource.java': realms,
+      'RealmAdminResource.java': realm,
+      'UsersResource.java': users,
+      'UserResource.java': user,
+    };
+    const extracted = Object.entries(files).flatMap(([file, content]) =>
+      jaxrsResolver.extract!(file, content).nodes
+    );
+    const ctx = {
+      getAllFiles: () => Object.keys(files),
+      readFile: (f: string) => files[f] ?? null,
+      iterateNodesByKind: function* (kind: string) {
+        if (kind === 'route') yield* extracted;
+      },
+    };
+    const updates = jaxrsResolver.postExtract!(ctx as never);
+    const names = new Map(extracted.map((n) => [n.id, n.name]));
+    for (const update of updates) names.set(update.id, update.name);
+    expect([...names.values()].sort()).toEqual([
+      'GET /admin/realms/{realm}/users',
+      'GET /admin/realms/{realm}/users/count',
+      'GET /admin/realms/{realm}/users/{user-id}',
+      'POST /admin/realms',
+      'POST /admin/realms/{realm}/users',
+    ]);
+  });
 });
 
 describe('koa plugin (framework: Koa / @koa/router)', () => {
