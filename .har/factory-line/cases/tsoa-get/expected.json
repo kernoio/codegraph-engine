@@ -1,5 +1,5 @@
 {
   "framework": "tsoa",
-  "source": "https://github.com/lukeautry/tsoa — tests/fixtures/controllers/getController.ts",
+  "source": "https://github.com/lukeautry/tsoa — tests/fixtures/controllers/getController.ts (placed under src/controllers; the upstream path is a test suite and is not an endpoint source)",
   "routes": ["GET /GetTest", "GET /GetTest/{id}"]
 }
