@@ -11,6 +11,7 @@ import { aiohttpResolver } from '../../src/plugins/aiohttp/resolver';
 import { akkaHttpResolver } from '../../src/plugins/akka-http/resolver';
 import { bottleResolver } from '../../src/plugins/bottle/resolver';
 import { djangoResolver } from '../../src/plugins/django/resolver';
+import { fastapiResolver } from '../../src/resolution/frameworks/python';
 import { elysiaResolver } from '../../src/plugins/elysia/resolver';
 import { fastEndpointsResolver } from '../../src/plugins/fastendpoints/resolver';
 import { falconResolver } from '../../src/plugins/falcon/resolver';
@@ -1139,6 +1140,26 @@ describe('django plugin (framework: Django / DRF)', () => {
       getAllFiles: () => ['requirements.txt'],
     };
     expect(djangoResolver.detect(negative as never)).toBe(false);
+  });
+
+  it('detects Django when pyproject.toml and manage.py live in a subfolder (BE-3412)', () => {
+    const flagsmithLike = {
+      readFile: (f: string) =>
+        f === 'api/pyproject.toml' ? '[project]\ndependencies = ["django>=5,<6"]\n' : null,
+      fileExists: (f: string) => f === 'api/manage.py',
+      getAllFiles: () => ['api/foo/urls.py', 'api/foo/views.py'],
+    };
+    expect(djangoResolver.detect(flagsmithLike as never)).toBe(true);
+
+    const manifestOnly = {
+      readFile: (f: string) =>
+        f === 'services/llm-gateway/pyproject.toml'
+          ? '[project]\ndependencies = ["fastapi>=0.115.0"]\n'
+          : null,
+      fileExists: () => false,
+      getAllFiles: () => ['services/llm-gateway/src/api/health.py'],
+    };
+    expect(fastapiResolver.detect(manifestOnly as never)).toBe(true);
   });
 });
 

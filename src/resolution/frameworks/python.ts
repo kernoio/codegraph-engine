@@ -8,19 +8,15 @@ import { Node } from '../../types';
 import { FrameworkResolver, UnresolvedRef, ResolutionContext, FrameworkExtractionResult } from '../types';
 import { stripCommentsForRegex } from '../strip-comments';
 import { resolveImportPath } from '../import-resolver';
+import { hasManagePy, pythonManifestMatches } from './python-manifests';
 
 export const djangoResolver: FrameworkResolver = {
   name: 'django',
   languages: ['python'],
 
   detect(context) {
-    const requirements = context.readFile('requirements.txt');
-    if (requirements && requirements.toLowerCase().includes('django')) return true;
-    const setup = context.readFile('setup.py');
-    if (setup && setup.toLowerCase().includes('django')) return true;
-    const pyproject = context.readFile('pyproject.toml');
-    if (pyproject && pyproject.toLowerCase().includes('django')) return true;
-    return context.fileExists('manage.py');
+    if (pythonManifestMatches(context, (c) => c.toLowerCase().includes('django'))) return true;
+    return hasManagePy(context);
   },
 
   resolve(ref, context) {
@@ -235,29 +231,14 @@ export const fastapiResolver: FrameworkResolver = {
   languages: ['python'],
 
   detect(context) {
-    const requirements = context.readFile('requirements.txt');
-    if (requirements && /\bfastapi\b/i.test(requirements)) return true;
-    const pyproject = context.readFile('pyproject.toml');
-    if (pyproject && /\bfastapi\b/i.test(pyproject)) return true;
-    for (const file of ['app.py', 'main.py', 'api.py']) {
-      const content = context.readFile(file);
+    if (pythonManifestMatches(context, (c) => /\bfastapi\b/i.test(c))) return true;
+    const entrypoints = context
+      .getAllFiles()
+      .filter((f) => /(?:^|\/)(app|application|main|api|wsgi|__init__)\.py$/.test(f))
+      .slice(0, 50);
+    for (const f of entrypoints) {
+      const content = context.readFile(f);
       if (content && content.includes('FastAPI(')) return true;
-    }
-    // A service that is one directory of a monorepo (`backend/pyproject.toml`,
-    // `backend/app/main.py`): its manifest or its app object sits below the root.
-    let looked = 0;
-    for (const file of context.getAllFiles()) {
-      const norm = file.replace(/\\/g, '/');
-      const base = norm.slice(norm.lastIndexOf('/') + 1);
-      if (base === 'requirements.txt' || base === 'pyproject.toml' || base === 'requirements-dev.txt') {
-        const content = context.readFile(file);
-        if (content && /\bfastapi\b/i.test(content)) return true;
-        if (++looked >= 40) break;
-      } else if ((base === 'main.py' || base === 'app.py' || base === 'api.py') && norm.split('/').length <= 4) {
-        const content = context.readFile(file);
-        if (content && content.includes('FastAPI(')) return true;
-        if (++looked >= 40) break;
-      }
     }
     return false;
   },
