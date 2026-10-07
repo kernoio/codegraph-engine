@@ -33,6 +33,7 @@ import {
 } from '../../resolution/types';
 import { stripCommentsForRegex } from '../../resolution/strip-comments';
 import { resolveImportPath } from '../../resolution/import-resolver';
+import { hasManagePy, pythonManifestMatches } from '../../resolution/frameworks/python-manifests';
 
 const DRF_ROUTER_CLS = /\b(?:DefaultRouter|SimpleRouter)\s*\(/;
 const DRF_IMPORT = /\bfrom\s+rest_framework\b|\bimport\s+rest_framework\b/;
@@ -47,13 +48,8 @@ export const djangoResolver: FrameworkResolver = {
   languages: ['python'],
 
   detect(context) {
-    const requirements = context.readFile('requirements.txt');
-    if (requirements && requirements.toLowerCase().includes('django')) return true;
-    const setup = context.readFile('setup.py');
-    if (setup && setup.toLowerCase().includes('django')) return true;
-    const pyproject = context.readFile('pyproject.toml');
-    if (pyproject && pyproject.toLowerCase().includes('django')) return true;
-    return context.fileExists('manage.py');
+    if (pythonManifestMatches(context, (c) => c.toLowerCase().includes('django'))) return true;
+    return hasManagePy(context);
   },
 
   resolve(ref, context) {
