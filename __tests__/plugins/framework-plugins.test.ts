@@ -354,6 +354,170 @@ export class ChildRoutesController extends SharedRoutesController {
     expect(updates[0]!.name).toBe('POST /api/v1/shared/widgets');
   });
 
+  it('applies @Route through a generic decorator such as @Response<T>(…)', () => {
+    const src = `
+import { Controller, Get, Post, Response, Route, Tags } from '@tsoa/runtime';
+@Route('/api/v1/projects/{projectUuid}/spaces')
+@Response<ApiErrorPayload>('default', 'Error')
+@Response<{ status: 'error'; message: Map<string, string[]> }>('400', 'Bad')
+@Tags('Spaces')
+export class SpaceController extends BaseController {
+  @SuccessResponse<ApiSpace>('200', 'Success')
+  @Get('{spaceUuid}')
+  async getSpace() {}
+
+  @Post('/')
+  async createSpace() {}
+}
+`;
+    const result = tsoaResolver.extract!('spaceController.ts', src);
+    expect(result.nodes.map((n) => n.name)).toEqual([
+      'GET /api/v1/projects/{projectUuid}/spaces/{spaceUuid}',
+      'POST /api/v1/projects/{projectUuid}/spaces/',
+    ]);
+  });
+
+  it('ignores controllers written inside string literals', () => {
+    const src = `
+const controller = parseSource('controller.ts', \`@Route('/api/private') class Controller { @Post('/write') write() {} }\`);
+`;
+    expect(tsoaResolver.extract!('routeInventory.fixtures.test.ts', src).nodes).toEqual([]);
+  });
+
+  describe('postExtract with import resolution', () => {
+    const files: Record<string, string> = {
+      'package.json': JSON.stringify({
+        dependencies: { tsoa: '^6.0.0', '@acme/shared': 'workspace:*' },
+      }),
+      'packages/shared/package.json': JSON.stringify({ name: '@acme/shared' }),
+      'packages/shared/base.ts': `
+@Route('/api/acme')
+export class AcmeBase {}
+`,
+      'src/fromWorkspace.ts': `
+import { AcmeBase } from '@acme/shared';
+export class FromWorkspace extends AcmeBase {
+  @Get('/v')
+  v() {}
+}
+`,
+      'src/fixture.test.ts': `const c = \`@Route('/api/private') class Controller { @Post('/write') write() {} }\`;`,
+      'src/other/controller.ts': `
+@Route('/elsewhere')
+export class Controller {}
+`,
+      'src/base.ts': `
+import { Controller } from 'tsoa';
+@Route('/api/v1/shared')
+export class Base extends Controller {}
+`,
+      'src/fromPackage.ts': `
+import { Controller, Get } from 'tsoa';
+export class FromPackage extends Controller {
+  @Get('/x')
+  x() {}
+}
+`,
+      'src/fromRelative.ts': `
+import { Base } from './base';
+export class FromRelative extends Base {
+  @Get('/y')
+  y() {}
+}
+`,
+      'src/lib/shared.ts': `
+@Route('/api/v1/lib')
+export class Shared {}
+`,
+      'src/lib/index.ts': `export { Shared } from './shared';`,
+      'src/fromBarrel.ts': `
+import { Shared } from './lib';
+export class FromBarrel extends Shared {
+  @Get('/z')
+  z() {}
+}
+`,
+      'src/fromAlias.ts': `
+import { Shared } from 'unmapped-alias/lib';
+export class FromAlias extends Shared {
+  @Get('/w')
+  w() {}
+}
+`,
+    };
+    const imports: Record<string, Array<{ localName: string; source: string }>> = {
+      'src/base.ts': [{ localName: 'Controller', source: 'tsoa' }],
+      'src/fromPackage.ts': [{ localName: 'Controller', source: 'tsoa' }],
+      'src/fromRelative.ts': [{ localName: 'Base', source: './base' }],
+      'src/fromBarrel.ts': [{ localName: 'Shared', source: './lib' }],
+      'src/fromAlias.ts': [{ localName: 'Shared', source: 'unmapped-alias/lib' }],
+      'src/fromWorkspace.ts': [{ localName: 'AcmeBase', source: '@acme/shared' }],
+    };
+    const route = (filePath: string, line: number, name: string) => ({
+      id: `route:${filePath}:${line}:${name}`,
+      kind: 'route',
+      name,
+      qualifiedName: `${filePath}::${name.replace(' ', ':')}`,
+      filePath,
+      startLine: line,
+      endLine: line,
+      startColumn: 0,
+      endColumn: 1,
+      language: 'typescript',
+      updatedAt: 0,
+    });
+    const ctx = {
+      getAllFiles: () => Object.keys(files),
+      readFile: (fp: string) => files[fp] ?? null,
+      fileExists: (fp: string) => fp in files,
+      getProjectRoot: () => '/repo',
+      getImportMappings: (fp: string) =>
+        (imports[fp] ?? []).map((im) => ({
+          ...im,
+          exportedName: im.localName,
+          isDefault: false,
+          isNamespace: false,
+        })),
+      getNodesInFile: (fp: string) => {
+        const own: Record<string, string> = {
+          'src/fromPackage.ts': 'GET /x',
+          'src/fromRelative.ts': 'GET /y',
+          'src/fromBarrel.ts': 'GET /z',
+          'src/fromAlias.ts': 'GET /w',
+          'src/fromWorkspace.ts': 'GET /v',
+        };
+        return own[fp] ? [route(fp, 4, own[fp]!)] : [];
+      },
+    } as any;
+
+    it('does not inherit a project prefix through a base class imported from a package', () => {
+      const updates = tsoaResolver.postExtract!(ctx);
+      expect(updates.find((u) => u.filePath === 'src/fromPackage.ts')).toBeUndefined();
+    });
+
+    it('inherits through a relatively imported base class from that file only', () => {
+      const updates = tsoaResolver.postExtract!(ctx);
+      expect(updates.find((u) => u.filePath === 'src/fromRelative.ts')?.name).toBe(
+        'GET /api/v1/shared/y'
+      );
+    });
+
+    it('inherits through a barrel that only re-exports the base class', () => {
+      const updates = tsoaResolver.postExtract!(ctx);
+      expect(updates.find((u) => u.filePath === 'src/fromBarrel.ts')?.name).toBe('GET /api/v1/lib/z');
+    });
+
+    it('inherits by name when the import source is neither a project file nor a declared dependency', () => {
+      const updates = tsoaResolver.postExtract!(ctx);
+      expect(updates.find((u) => u.filePath === 'src/fromAlias.ts')?.name).toBe('GET /api/v1/lib/w');
+    });
+
+    it('inherits from a workspace sibling package, which is project code, not an installed one', () => {
+      const updates = tsoaResolver.postExtract!(ctx);
+      expect(updates.find((u) => u.filePath === 'src/fromWorkspace.ts')?.name).toBe('GET /api/acme/v');
+    });
+  });
+
   it('does not treat NestJS @Controller + @Post as tsoa routes', () => {
     const nestSrc = `
 @Controller('auth')

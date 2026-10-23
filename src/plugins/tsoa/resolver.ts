@@ -12,7 +12,16 @@ import {
   FrameworkExtractionResult,
   ResolutionContext,
 } from '../../resolution/types';
-import { stripCommentsForRegex, type CommentLang } from '../../resolution/strip-comments';
+import {
+  blankStringContents,
+  stripCommentsForRegex,
+  type CommentLang,
+} from '../../resolution/strip-comments';
+import { resolveImportPath } from '../../resolution/import-resolver';
+import {
+  declaredDependencies,
+  projectPackageNames,
+} from '../../resolution/frameworks/package-deps';
 
 const HTTP_METHODS = ['Get', 'Post', 'Put', 'Patch', 'Delete', 'Head', 'Options'];
 const HTTP_DECORATOR_RE = new RegExp(`@(${HTTP_METHODS.join('|')})\\s*\\(`);
@@ -75,10 +84,11 @@ export const tsoaResolver: FrameworkResolver = {
       }
 
       const safe = stripCommentsForRegex(content, commentLangForFile(filePath));
-      const scopes = buildRouteScopes(safe);
+      const code = blankStringContents(safe);
+      const scopes = buildRouteScopes(safe, code);
       const existing = context.getNodesInFile(filePath).filter((n) => n.kind === 'route');
 
-      for (const hit of findDecorators(safe, HTTP_METHODS)) {
+      for (const hit of findDecorators(safe, code, HTTP_METHODS)) {
         const scope = scopeFor(scopes, hit.index);
         if (!scope || scope.isNestController) continue;
 
@@ -134,6 +144,13 @@ interface ClassMeta {
   className: string;
   prefix: string | null;
   extendsName: string | null;
+  /**
+   * Where the parent class comes from when it is imported: the project file the
+   * import resolves to, `null` for a declared dependency (`Controller` from
+   * `tsoa`), which carries no project `@Route`. `undefined` when the parent is
+   * not imported or its source cannot be placed.
+   */
+  extendsFile?: string | null;
 }
 
 function extractFromSafe(
@@ -144,9 +161,10 @@ function extractFromSafe(
   const nodes: Node[] = [];
   const references: UnresolvedRef[] = [];
   const now = Date.now();
-  const scopes = buildRouteScopes(safe);
+  const code = blankStringContents(safe);
+  const scopes = buildRouteScopes(safe, code);
 
-  for (const hit of findDecorators(safe, HTTP_METHODS)) {
+  for (const hit of findDecorators(safe, code, HTTP_METHODS)) {
     const scope = scopeFor(scopes, hit.index);
     // NestJS `@Controller` classes share `@Get`/`@Post` with tsoa; leave them
     // to the Nest resolver. Allow `@Route` and `extends` (cross-file inherit).
@@ -189,11 +207,16 @@ function extractFromSafe(
   return { nodes, references };
 }
 
-function findDecorators(safe: string, names: string[]): DecoratorHit[] {
+/**
+ * Decorator hits are found in [code] (string contents blanked, so a decorator
+ * written inside a string — a test fixture's source text — is not one) and
+ * their arguments read from [safe] at the same offsets.
+ */
+function findDecorators(safe: string, code: string, names: string[]): DecoratorHit[] {
   const hits: DecoratorHit[] = [];
   const re = new RegExp(`@(${names.join('|')})\\s*\\(`, 'g');
   let m: RegExpExecArray | null;
-  while ((m = re.exec(safe)) !== null) {
+  while ((m = re.exec(code)) !== null) {
     const openIndex = m.index + m[0].length - 1;
     const parsed = readArgs(safe, openIndex);
     if (!parsed) continue;
@@ -255,6 +278,12 @@ function methodNameAfter(safe: string, start: number): string | null {
     if (!decoName.exec(safe)) break;
     i = decoName.lastIndex;
     eatWs();
+    if (safe[i] === '<') {
+      const close = typeArgsEnd(safe, i);
+      if (close < 0) return null;
+      i = close;
+      eatWs();
+    }
     if (safe[i] === '(') {
       const parsed = readArgs(safe, i);
       if (!parsed) return null;
@@ -278,7 +307,8 @@ function methodNameAfter(safe: string, start: number): string | null {
   return m ? m[1]! : null;
 }
 
-function buildRouteScopes(safe: string): RouteScope[] {
+/** Class scopes found in [code] (string contents blanked); `@Route` arguments read from [safe]. */
+function buildRouteScopes(safe: string, code: string): RouteScope[] {
   const localPrefix = new Map<string, string>();
   const extendsMap = new Map<string, string>();
   const classStarts = new Map<string, number>();
@@ -287,26 +317,26 @@ function buildRouteScopes(safe: string): RouteScope[] {
 
   const routeRe = /@Route\s*\(/g;
   let rm: RegExpExecArray | null;
-  while ((rm = routeRe.exec(safe)) !== null) {
+  while ((rm = routeRe.exec(code)) !== null) {
     const parsed = readArgs(safe, rm.index + rm[0].length - 1);
     if (!parsed) continue;
-    const className = classNameAfter(safe, rm.index);
+    const className = classNameAfter(code, rm.index);
     if (className) localPrefix.set(className, parseStringArg(parsed.args));
   }
 
   const controllerRe = /@Controller\s*\(/g;
   let cmCtrl: RegExpExecArray | null;
-  while ((cmCtrl = controllerRe.exec(safe)) !== null) {
-    const parsed = readArgs(safe, cmCtrl.index + cmCtrl[0].length - 1);
+  while ((cmCtrl = controllerRe.exec(code)) !== null) {
+    const parsed = readArgs(code, cmCtrl.index + cmCtrl[0].length - 1);
     if (!parsed) continue;
-    const className = classNameAfter(safe, cmCtrl.index);
+    const className = classNameAfter(code, cmCtrl.index);
     if (className) nestControllers.add(className);
   }
 
   const classRe =
     /(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)(?:\s+extends\s+([A-Za-z_$][\w$]*))?/g;
   let cm: RegExpExecArray | null;
-  while ((cm = classRe.exec(safe)) !== null) {
+  while ((cm = classRe.exec(code)) !== null) {
     classStarts.set(cm[1]!, cm.index);
     if (cm[2]) extendsMap.set(cm[1]!, cm[2]!);
   }
@@ -371,6 +401,12 @@ function classNameAfter(safe: string, start: number): string | null {
     if (!decoName.exec(safe)) break;
     i = decoName.lastIndex;
     eatWs();
+    if (safe[i] === '<') {
+      const close = typeArgsEnd(safe, i);
+      if (close < 0) return null;
+      i = close;
+      eatWs();
+    }
     if (safe[i] === '(') {
       const parsed = readArgs(safe, i);
       if (!parsed) return null;
@@ -382,6 +418,25 @@ function classNameAfter(safe: string, start: number): string | null {
   classDecl.lastIndex = i;
   const m = classDecl.exec(safe);
   return m ? m[1]! : null;
+}
+
+/**
+ * Index just past the `>` closing the type-argument list opened at `open`
+ * (`@Response<ApiErrorPayload>(…)`, `@Response<{ a: string; b: number }>(…)`),
+ * or -1 when it never closes. An arrow's `=>` inside the list is not a closing
+ * bracket.
+ */
+function typeArgsEnd(safe: string, open: number): number {
+  let depth = 0;
+  for (let i = open; i < safe.length; i++) {
+    const ch = safe[i]!;
+    if (ch === '<') depth++;
+    else if (ch === '>' && safe[i - 1] !== '=') {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return -1;
 }
 
 function scopeFor(scopes: RouteScope[], index: number): RouteScope | null {
@@ -437,25 +492,29 @@ function collectClassMetadata(context: ResolutionContext): ClassMeta[] {
     if (!content || (!content.includes('@Route') && !/\bclass\s+/.test(content))) continue;
 
     const safe = stripCommentsForRegex(content, commentLangForFile(filePath));
+    // A class written inside a string (a test fixture's source text) is not a class.
+    const code = blankStringContents(safe);
     const prefixes = new Map<string, string>();
     const routeRe = /@Route\s*\(/g;
     let rm: RegExpExecArray | null;
-    while ((rm = routeRe.exec(safe)) !== null) {
+    while ((rm = routeRe.exec(code)) !== null) {
       const parsed = readArgs(safe, rm.index + rm[0].length - 1);
       if (!parsed) continue;
-      const className = classNameAfter(safe, rm.index);
+      const className = classNameAfter(code, rm.index);
       if (className) prefixes.set(className, parseStringArg(parsed.args));
     }
 
     const classRe =
       /(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)(?:\s+extends\s+([A-Za-z_$][\w$]*))?/g;
     let cm: RegExpExecArray | null;
-    while ((cm = classRe.exec(safe)) !== null) {
+    while ((cm = classRe.exec(code)) !== null) {
+      const extendsName = cm[2] ?? null;
       out.push({
         filePath,
         className: cm[1]!,
         prefix: prefixes.get(cm[1]!) ?? null,
-        extendsName: cm[2] ?? null,
+        extendsName,
+        extendsFile: extendsName ? importedFrom(context, filePath, extendsName) : undefined,
       });
     }
   }
@@ -489,14 +548,18 @@ function resolveInheritedRoutePrefixes(meta: ClassMeta[]): Map<string, string> {
       return '';
     }
 
-    // Prefer a parent declared in the same file, then any project class with that name.
+    // Prefer a parent declared in the same file, then the one in the file it is
+    // imported from; a parent from a declared dependency has no project prefix.
+    // Otherwise — not imported, or imported through a barrel that only
+    // re-exports it — any project class with that name.
     const sameFile = byKey.get(`${m.filePath}::${m.extendsName}`);
     let prefix = '';
     if (sameFile) {
       prefix = resolve(`${sameFile.filePath}::${sameFile.className}`, seen);
-    } else {
-      for (const candidate of meta) {
-        if (candidate.className !== m.extendsName) continue;
+    } else if (m.extendsFile !== null) {
+      const named = meta.filter((c) => c.className === m.extendsName);
+      const inImportedFile = named.filter((c) => c.filePath === m.extendsFile);
+      for (const candidate of inImportedFile.length > 0 ? inImportedFile : named) {
         prefix = resolve(`${candidate.filePath}::${candidate.className}`, seen);
         if (prefix) break;
       }
@@ -512,4 +575,34 @@ function resolveInheritedRoutePrefixes(meta: ClassMeta[]): Map<string, string> {
     if (prefix) out.set(key, prefix);
   }
   return out;
+}
+
+/**
+ * The project file [localName] is imported from in [filePath]: `null` when it
+ * comes from an installed dependency, `undefined` when it is not imported or
+ * its source is neither a project file nor an installed dependency (an alias
+ * the resolver cannot follow, or a workspace sibling package, say).
+ */
+function importedFrom(
+  context: ResolutionContext,
+  filePath: string,
+  localName: string
+): string | null | undefined {
+  if (typeof context.getImportMappings !== 'function') return undefined;
+  const lang = commentLangForFile(filePath);
+  const mapping = context
+    .getImportMappings(filePath, lang)
+    .find((im) => im.localName === localName);
+  if (!mapping) return undefined;
+  const resolved = resolveImportPath(mapping.source, filePath, lang, context);
+  if (resolved) return resolved;
+  const pkg = packageName(mapping.source);
+  const installed = declaredDependencies(context).has(pkg) && !projectPackageNames(context).has(pkg);
+  return installed ? null : undefined;
+}
+
+/** `tsoa` for `tsoa`, `@tsoa/runtime` for `@tsoa/runtime/dist/x`. */
+function packageName(source: string): string {
+  const parts = source.split('/');
+  return source.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]!;
 }
