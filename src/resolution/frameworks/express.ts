@@ -172,10 +172,14 @@ export const expressResolver: FrameworkResolver = {
     const now = Date.now();
     const lang = detectLanguage(filePath);
     const safe = stripCommentsForRegex(content, lang);
-    // Match the route head up to the first arg: (app|router).METHOD('/path',
+    // Match the route head up to the first arg: <receiver>.METHOD('/path',
     // (NOT the whole call — handlers are often inline arrows whose `)`/`{}` the
     // old single-regex couldn't span, so inline-handler routes connected to nothing.)
-    const head = /\b(app|router)\s*\.\s*(get|post|put|patch|delete|all|use)\s*\(\s*['"]([^'"]+)['"]\s*,/g;
+    const receiver = routeReceivers(safe);
+    const head = new RegExp(
+      `(?<![\\w$])(${receiver})\\s*\\.\\s*(get|post|put|patch|delete|all|use)\\s*\\(\\s*['"]([^'"]+)['"]\\s*,`,
+      'g'
+    );
     let match: RegExpExecArray | null;
     while ((match = head.exec(safe)) !== null) {
       const method = match[2]!;
@@ -259,7 +263,10 @@ export const expressResolver: FrameworkResolver = {
     // The chained form: `router.route('/:id').get(getProduct).put(protect, updateProduct)`
     // — one path, several methods, each with its own handler. One route node
     // per method, at the line of its `.method(`, bound like the plain form.
-    const chainHead = /\b(?:app|router)\s*\.\s*route\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+    const chainHead = new RegExp(
+      `(?<![\\w$])(?:${receiver})\\s*\\.\\s*route\\s*\\(\\s*['"]([^'"]+)['"]\\s*\\)`,
+      'g'
+    );
     while ((match = chainHead.exec(safe)) !== null) {
       const routePath = match[1]!;
       let at = match.index + match[0].length;
@@ -396,6 +403,20 @@ export const expressResolver: FrameworkResolver = {
     return updates;
   },
 };
+
+/**
+ * Regex alternation of the identifiers routes are registered on: `app` and
+ * `router` by convention, plus any name the file binds to an app or router —
+ * `export const savedChartRouter: Router = express.Router({ mergeParams: true })`.
+ */
+function routeReceivers(safe: string): string {
+  const names = new Set(['app', 'router']);
+  const binding =
+    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::\s*[\w$.<>]+\s*)?=\s*(?:express\s*\.\s*Router|Router|express)\s*\(/g;
+  let m: RegExpExecArray | null;
+  while ((m = binding.exec(safe)) !== null) names.add(m[1]!);
+  return [...names].map((n) => n.replace(/\$/g, '\\$')).join('|');
+}
 
 /** Top-level comma split of an argument list, strings and brackets respected. */
 function splitTopLevel(args: string): string[] {

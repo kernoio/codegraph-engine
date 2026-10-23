@@ -24,14 +24,28 @@ const MAX_MANIFESTS = 24;
  * gated on detection) and then resolved none of its navigation. Re-reading
  * when the file count changes costs one manifest sweep per index.
  */
-const cache = new WeakMap<ResolutionContext, { files: number; names: Set<string> }>();
+const cache = new WeakMap<ResolutionContext, { files: number; names: Set<string>; own: Set<string> }>();
 
 /** Every dependency name declared at the root or up to two directories down, de-duplicated. */
 export function declaredDependencies(context: ResolutionContext): Set<string> {
+  return readManifests(context).names;
+}
+
+/**
+ * The `name` of every package in the project itself, read from the same
+ * manifests: a dependency listed here is a workspace sibling (`workspace:*`),
+ * whose code is indexed with the project rather than installed from a registry.
+ */
+export function projectPackageNames(context: ResolutionContext): Set<string> {
+  return readManifests(context).own;
+}
+
+function readManifests(context: ResolutionContext): { names: Set<string>; own: Set<string> } {
   const files = context.getAllFiles();
   const cached = cache.get(context);
-  if (cached && cached.files === files.length) return cached.names;
+  if (cached && cached.files === files.length) return cached;
   const names = new Set<string>();
+  const own = new Set<string>();
   // The index lists source files, never manifests: the candidate directories
   // are the first one or two segments of what IS indexed, probed on disk.
   const dirs = new Set<string>();
@@ -50,7 +64,8 @@ export function declaredDependencies(context: ResolutionContext): Set<string> {
     const content = context.readFile(manifest);
     if (!content) continue;
     try {
-      const pkg = JSON.parse(content) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string>; peerDependencies?: Record<string, string> };
+      const pkg = JSON.parse(content) as { name?: string; dependencies?: Record<string, string>; devDependencies?: Record<string, string>; peerDependencies?: Record<string, string> };
+      if (typeof pkg.name === 'string') own.add(pkg.name);
       for (const group of [pkg.dependencies, pkg.devDependencies, pkg.peerDependencies]) {
         if (group && typeof group === 'object') for (const name of Object.keys(group)) names.add(name);
       }
@@ -58,8 +73,9 @@ export function declaredDependencies(context: ResolutionContext): Set<string> {
       // Not JSON — a template, a broken manifest; nothing to read.
     }
   }
-  cache.set(context, { files: files.length, names });
-  return names;
+  const entry = { files: files.length, names, own };
+  cache.set(context, entry);
+  return entry;
 }
 
 /** True when any of `deps` is declared anywhere the project's manifests are read. */

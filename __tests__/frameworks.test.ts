@@ -245,6 +245,39 @@ describe('expressResolver.extract', () => {
     const { nodes, references } = expressResolver.extract!('routes.ts', src);
     expect(references[0].referenceName).toBe('list');
   });
+
+  it('extracts routes on a router bound to a name other than app/router', () => {
+    const src = `import express, { type Router } from 'express';
+export const savedChartRouter: Router = express.Router({ mergeParams: true });
+savedChartRouter.get('/:savedQueryUuidOrSlug', isAuthenticated, async (req, res) => {});
+savedChartRouter.route('/:uuid/history').get(listHistory).delete(clearHistory);
+`;
+    const { nodes } = expressResolver.extract!('savedChartRouter.ts', src);
+    expect(nodes.map((n) => n.name)).toEqual([
+      'GET /:savedQueryUuidOrSlug',
+      'GET /:uuid/history',
+      'DELETE /:uuid/history',
+    ]);
+  });
+
+  it('extracts routes on an app bound by express() and a bare Router()', () => {
+    const src = `const expressApp = express();
+const api = Router();
+const $v2 = express.Router();
+expressApp.get('/health', health);
+api.post('/items', createItem);
+$v2.get('/dollar', dollar);
+`;
+    const { nodes } = expressResolver.extract!('app.ts', src);
+    expect(nodes.map((n) => n.name)).toEqual(['GET /health', 'POST /items', 'GET /dollar']);
+  });
+
+  it('ignores method calls on names not bound to an app or router', () => {
+    const src = `const cache = new Map();
+cache.get('/key', fallback);
+`;
+    expect(expressResolver.extract!('cache.ts', src).nodes).toEqual([]);
+  });
 });
 
 import { nestjsResolver } from '../src/resolution/frameworks/nestjs';
