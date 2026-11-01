@@ -91,9 +91,12 @@ const TAKEOVER_RETRY_DELAY_MS = 100;
 /**
  * Create an in-process fallback only when it cannot conflict with a live
  * legacy daemon. Plain-PID locks cannot prove daemon identity, but they still
- * prove that a process owns the legacy writer slot.
+ * prove that a process owns the legacy writer slot. A lock naming this very
+ * process is a leftover whose PID was recycled (a fresh container's PID
+ * namespace hands out the same numbers), never a live rival.
  */
-function makeFallbackEngine(root: string): MCPEngine {
+export function makeFallbackEngine(root: string): MCPEngine {
+  const liveRival = (pid: number): boolean => pid > 0 && pid !== process.pid && isProcessAlive(pid);
   let existing: ReturnType<typeof decodeLockInfo> = null;
   try {
     existing = decodeLockInfo(fs.readFileSync(getDaemonPidPath(root), 'utf8'));
@@ -105,7 +108,7 @@ function makeFallbackEngine(root: string): MCPEngine {
   }
   if (
     existing &&
-    isProcessAlive(existing.pid) &&
+    liveRival(existing.pid) &&
     !canProbeDaemonIdentity(existing)
   ) {
     throw new Error(
@@ -113,10 +116,10 @@ function makeFallbackEngine(root: string): MCPEngine {
     );
   }
   const writer = readWriterLock(root);
-  if (writer && writer.pid > 0 && isProcessAlive(writer.pid)) {
+  if (writer && liveRival(writer.pid)) {
     throw new Error(writerLockHeldMessage(writer, getWriterPidPath(root)));
   }
-  if (existing && isProcessAlive(existing.pid)) {
+  if (existing && liveRival(existing.pid)) {
     throw new Error(
       `Cannot start an in-process fallback while live daemon pid ${existing.pid} holds the project lock.`
     );
