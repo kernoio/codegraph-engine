@@ -739,6 +739,82 @@ fun Application.configureRouting() {
 }
 `;
 
+/** aicore agent-apps-agent-jvm — helper-wrapped route + ApplicationScope-style verbs (trimmed) */
+export const KTOR_AICORE_APPLICATION_ROUTE = `
+package io.kerno.agent.routes
+
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.routing.route
+
+fun applicationRoute(path: String, block: Route.() -> Unit) {
+    route(path, block)
+}
+
+fun Route.endpointRoutes() {
+    applicationRoute("/workspaces/{workspaceId}/applications/{applicationId}/endpoints") {
+        get {
+            call.respond(emptyList())
+        }
+    }
+    applicationRoute("/workspaces/{workspaceId}/applications/{applicationId}/mcp-tools") {
+        get {
+            call.respond(emptyList())
+        }
+    }
+}
+`;
+
+export const KTOR_AICORE_APPLICATION_SCOPE = `
+package io.kerno.agent.routes
+
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.delete
+import io.ktor.server.routing.get
+import io.ktor.server.routing.patch
+import io.ktor.server.routing.post
+import io.ktor.server.routing.put
+
+class ApplicationScope(private val route: Route) {
+    fun get(path: String, block: suspend () -> Unit) {
+        route.get(path) { block() }
+    }
+    fun post(path: String, block: suspend () -> Unit) {
+        route.post(path) { block() }
+    }
+    fun put(path: String, block: suspend () -> Unit) {
+        route.put(path) { block() }
+    }
+    fun patch(path: String, block: suspend () -> Unit) {
+        route.patch(path) { block() }
+    }
+    fun delete(path: String, block: suspend () -> Unit) {
+        route.delete(path) { block() }
+    }
+}
+
+fun Route.applicationRoutes(block: ApplicationScope.() -> Unit) {
+    ApplicationScope(this).block()
+}
+`;
+
+export const KTOR_AICORE_MOUNTED_SCOPE_ROUTES = `
+package io.kerno.agent.routes
+
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.route
+
+fun Route.registerApplicationApi() {
+    route("/workspaces/{workspaceId}/applications/{applicationId}") {
+        applicationRoutes {
+            get("/endpoints") { }
+            post("/endpoints") { }
+            get("/mcp-tools") { }
+        }
+    }
+}
+`;
+
 /** https://github.com/antirez/lamernews — app.rb (trimmed top-level Sinatra DSL) */
 export const LAMERNEWS_SINATRA_ROUTES = `
 require 'sinatra'

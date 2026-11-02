@@ -2,7 +2,8 @@
  * Ktor HTTP routing DSL (Kerno in-repo plugin)
  *
  * Covers `routing { get("/x") }`, nested `route("/prefix") { … }`, verb helpers
- * without a path (inherit parent), and `route("/x", HttpMethod.Get)`.
+ * without a path (inherit parent), `route("/x", HttpMethod.Get)`, user helpers that
+ * delegate to `route(path) { … }`, and receiver-style `route.get("/segment")`.
  */
 
 import { Node } from '../../types';
@@ -83,6 +84,7 @@ export function extractKtorRoutes(filePath: string, content: string): FrameworkE
   }
 
   const safe = stripCommentsForRegex(content, 'java');
+  const routeDelegates = collectRouteDelegateNames(safe);
   const nodes: Node[] = [];
   const references: UnresolvedRef[] = [];
   const now = Date.now();
@@ -90,6 +92,103 @@ export function extractKtorRoutes(filePath: string, content: string): FrameworkE
   const prefixStack: string[] = [''];
   type BraceKind = 'route' | 'other';
   const braceStack: BraceKind[] = [];
+
+  const tryRouteMount = (name: string, start: number, openParen: number): number | null => {
+    const args = parseCallArgs(safe, openParen);
+    if (!args) return null;
+    const pathLit = firstStringArg(args.inner);
+    if (pathLit == null) return null;
+    const httpMethod = name === 'route' ? parseHttpMethodArg(args.inner) : null;
+    let k = skipWs(safe, args.end);
+    if (safe[k] !== '{') return null;
+    const full = joinPaths(prefixStack[prefixStack.length - 1]!, pathLit);
+    if (httpMethod && pathLit != null) {
+      pushRoute(nodes, filePath, lineAt(safe, start), httpMethod, full, now, k - start);
+    }
+    prefixStack.push(full === '/' ? '' : full);
+    braceStack.push('route');
+    return k + 1;
+  };
+
+  const tryVerb = (name: string, start: number, afterName: number, hadTypeArgs: boolean): number | null => {
+    let j = afterName;
+    if (safe[j] === '(') {
+      const args = parseCallArgs(safe, j);
+      if (!args) return null;
+      const pathLit = firstStringArg(args.inner);
+      const methodRef = parseMethodRef(args.inner);
+      const prefix = prefixStack[prefixStack.length - 1]!;
+      // Type-safe Resources: get<Articles> { … } with no string path — skip
+      if (!(hadTypeArgs && pathLit == null) && shouldEmitVerbWithParenArgs(prefix, args.inner, pathLit)) {
+        const full = joinPaths(prefix, pathLit ?? '');
+        const routeNode = pushRoute(
+          nodes,
+          filePath,
+          lineAt(safe, start),
+          name.toUpperCase(),
+          full,
+          now,
+          args.end - start
+        );
+        if (methodRef) {
+          references.push({
+            fromNodeId: routeNode.id,
+            referenceName: methodRef,
+            referenceKind: 'references',
+            line: routeNode.startLine,
+            column: 0,
+            filePath,
+            language: 'kotlin',
+          });
+        }
+      }
+      let k = skipWs(safe, args.end);
+      if (safe[k] === '{') {
+        braceStack.push('other');
+        return k + 1;
+      }
+      return args.end;
+    }
+    if (safe[j] === '{') {
+      if (!hadTypeArgs) {
+        const full = joinPaths(prefixStack[prefixStack.length - 1]!, '');
+        pushRoute(nodes, filePath, lineAt(safe, start), name.toUpperCase(), full, now, j - start);
+      }
+      braceStack.push('other');
+      return j + 1;
+    }
+    return null;
+  };
+
+  const tryRoutingToken = (start: number): number | null => {
+    const identMatch = safe.slice(start).match(/^([A-Za-z_]\w*)/);
+    if (!identMatch) return null;
+    const name = identMatch[1]!;
+    const isBuiltinRoute = name === 'route' || VERBS.has(name);
+    if (!isBuiltinRoute && !routeDelegates.has(name)) return null;
+    let j = start + name.length;
+    j = skipWs(safe, j);
+
+    let hadTypeArgs = false;
+    if (safe[j] === '<') {
+      const after = skipTypeArgs(safe, j);
+      if (after > j) {
+        hadTypeArgs = true;
+        j = skipWs(safe, after);
+      }
+    }
+
+    if (name === 'route' && safe[j] === '(') {
+      return tryRouteMount(name, start, j);
+    }
+    if (routeDelegates.has(name) && safe[j] === '(') {
+      return tryRouteMount(name, start, j);
+    }
+    if (VERBS.has(name)) {
+      return tryVerb(name, start, j, hadTypeArgs);
+    }
+    return null;
+  };
 
   let i = 0;
   while (i < safe.length) {
@@ -100,88 +199,19 @@ export function extractKtorRoutes(filePath: string, content: string): FrameworkE
       continue;
     }
 
+    if (c === '.' && isIdentStart(safe[i + 1]!)) {
+      const next = tryRoutingToken(i + 1);
+      if (next != null) {
+        i = next;
+        continue;
+      }
+    }
+
     if (isIdentStart(c) && (i === 0 || !isIdentContinue(safe[i - 1]!)) && safe[i - 1] !== '.') {
-      const wordMatch = safe.slice(i).match(/^(route|get|post|put|patch|delete|head|options)\b/);
-      if (wordMatch) {
-        const name = wordMatch[1]!;
-        let j = i + name.length;
-        j = skipWs(safe, j);
-
-        let hadTypeArgs = false;
-        if (safe[j] === '<') {
-          const after = skipTypeArgs(safe, j);
-          if (after > j) {
-            hadTypeArgs = true;
-            j = skipWs(safe, after);
-          }
-        }
-
-        if (name === 'route' && safe[j] === '(') {
-          const args = parseCallArgs(safe, j);
-          if (args) {
-            const pathLit = firstStringArg(args.inner);
-            const httpMethod = parseHttpMethodArg(args.inner);
-            let k = skipWs(safe, args.end);
-            if (safe[k] === '{') {
-              const full = joinPaths(prefixStack[prefixStack.length - 1]!, pathLit ?? '');
-              if (httpMethod && pathLit != null) {
-                pushRoute(nodes, filePath, lineAt(safe, i), httpMethod, full, now, k - i);
-              }
-              prefixStack.push(full === '/' ? '' : full);
-              braceStack.push('route');
-              i = k + 1;
-              continue;
-            }
-          }
-        } else if (VERBS.has(name)) {
-          if (safe[j] === '(') {
-            const args = parseCallArgs(safe, j);
-            if (args) {
-              const pathLit = firstStringArg(args.inner);
-              const methodRef = parseMethodRef(args.inner);
-              // Type-safe Resources: get<Articles> { … } with no string path — skip
-              if (!(hadTypeArgs && pathLit == null)) {
-                const full = joinPaths(prefixStack[prefixStack.length - 1]!, pathLit ?? '');
-                const routeNode = pushRoute(
-                  nodes,
-                  filePath,
-                  lineAt(safe, i),
-                  name.toUpperCase(),
-                  full,
-                  now,
-                  args.end - i
-                );
-                if (methodRef) {
-                  references.push({
-                    fromNodeId: routeNode.id,
-                    referenceName: methodRef,
-                    referenceKind: 'references',
-                    line: routeNode.startLine,
-                    column: 0,
-                    filePath,
-                    language: 'kotlin',
-                  });
-                }
-              }
-              let k = skipWs(safe, args.end);
-              if (safe[k] === '{') {
-                braceStack.push('other');
-                i = k + 1;
-                continue;
-              }
-              i = args.end;
-              continue;
-            }
-          } else if (safe[j] === '{') {
-            if (!hadTypeArgs) {
-              const full = joinPaths(prefixStack[prefixStack.length - 1]!, '');
-              pushRoute(nodes, filePath, lineAt(safe, i), name.toUpperCase(), full, now, j - i);
-            }
-            braceStack.push('other');
-            i = j + 1;
-            continue;
-          }
-        }
+      const next = tryRoutingToken(i);
+      if (next != null) {
+        i = next;
+        continue;
       }
     }
 
@@ -252,6 +282,75 @@ function joinPaths(prefix: string, segment: string): string {
 function firstStringArg(inner: string): string | null {
   const m = inner.match(/^\s*"([^"]*)"/);
   return m ? m[1]! : null;
+}
+
+/** User helpers like `applicationRoute(path) { route(path) { … } }`. */
+function collectRouteDelegateNames(content: string): Set<string> {
+  const names = new Set<string>();
+  const funRe = /\bfun\s+(?:[\w.]+\.)?(\w+)\s*\(/g;
+  let m: RegExpExecArray | null;
+  while ((m = funRe.exec(content)) !== null) {
+    const fnName = m[1]!;
+    if (fnName === 'Route' || VERBS.has(fnName)) continue;
+    const openParen = m.index + m[0].length - 1;
+    const closeParen = findMatchingParen(content, openParen);
+    if (closeParen < 0) continue;
+    const params = content.slice(openParen + 1, closeParen);
+    const firstStringParam = params.match(/^\s*(\w+)\s*:\s*String\b/);
+    if (!firstStringParam) continue;
+    const paramName = firstStringParam[1]!;
+    let i = skipWs(content, closeParen + 1);
+    if (content[i] === ':') {
+      i++;
+      while (i < content.length && content[i] !== '{') {
+        if (content[i] === '(') {
+          const end = findMatchingParen(content, i);
+          i = end >= 0 ? end + 1 : i + 1;
+          continue;
+        }
+        i++;
+      }
+    }
+    if (content[i] !== '{') continue;
+    const bodySlice = content.slice(i + 1, i + 1 + 500);
+    if (new RegExp(`\\broute\\s*\\(\\s*${paramName}\\b`).test(bodySlice)) {
+      names.add(fnName);
+    }
+  }
+  return names;
+}
+
+function findMatchingParen(src: string, openIdx: number): number {
+  if (src[openIdx] !== '(') return -1;
+  let depth = 1;
+  let i = openIdx + 1;
+  while (i < src.length && depth > 0) {
+    const c = src[i]!;
+    if (c === '"' || c === "'" || c === '`') {
+      i = skipString(src, i);
+      continue;
+    }
+    if (c === '(') depth++;
+    else if (c === ')') {
+      depth--;
+      if (depth === 0) return i;
+    }
+    i++;
+  }
+  return -1;
+}
+
+/** Skip `get(path)` inside Route extension helpers (false GET /) and other non-literal paths at root. */
+function shouldEmitVerbWithParenArgs(
+  prefix: string,
+  argsInner: string,
+  pathLit: string | null
+): boolean {
+  if (pathLit != null) return true;
+  const trimmed = argsInner.trim();
+  if (!trimmed) return !!prefix;
+  if (/^::/.test(trimmed) || /^[\w.]+\s*::/.test(trimmed)) return !!prefix;
+  return false;
 }
 
 function parseHttpMethodArg(inner: string): string | null {

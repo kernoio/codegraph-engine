@@ -127,6 +127,9 @@ import {
   KHALID_ROOT_ENDPOINT,
   KOA_EXAMPLES_BLOG_APP,
   KOA_NESTED_MOUNT_EXAMPLE,
+  KTOR_AICORE_APPLICATION_ROUTE,
+  KTOR_AICORE_APPLICATION_SCOPE,
+  KTOR_AICORE_MOUNTED_SCOPE_ROUTES,
   KTOR_SAMPLES_WISH_ROUTING,
   KTOR_STARTER_WIDGET_RESOURCE,
   LAMERNEWS_SINATRA_ROUTES,
@@ -2435,6 +2438,37 @@ class WidgetResourceTest {
 `;
     const result = ktorResolver.extract!('src/test/kotlin/web/WidgetResourceTest.kt', src);
     expect(result.nodes).toEqual([]);
+  });
+
+  it('extracts aicore-style applicationRoute wrappers with brace get handlers', () => {
+    const result = ktorResolver.extract!(
+      'routes/EndpointRoutes.kt',
+      KTOR_AICORE_APPLICATION_ROUTE
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /workspaces/{workspaceId}/applications/{applicationId}/endpoints',
+      'GET /workspaces/{workspaceId}/applications/{applicationId}/mcp-tools',
+    ]);
+  });
+
+  it('does not emit GET / from ApplicationScope route.get(path) helpers', () => {
+    const result = ktorResolver.extract!(
+      'routes/ApplicationScope.kt',
+      KTOR_AICORE_APPLICATION_SCOPE
+    );
+    expect(result.nodes).toEqual([]);
+  });
+
+  it('joins mount prefix for receiver-style scope.get(path) call sites', () => {
+    const result = ktorResolver.extract!(
+      'routes/ApplicationRoutes.kt',
+      KTOR_AICORE_MOUNTED_SCOPE_ROUTES
+    );
+    expect(result.nodes.map((n) => n.name).sort()).toEqual([
+      'GET /workspaces/{workspaceId}/applications/{applicationId}/endpoints',
+      'GET /workspaces/{workspaceId}/applications/{applicationId}/mcp-tools',
+      'POST /workspaces/{workspaceId}/applications/{applicationId}/endpoints',
+    ]);
   });
 
   it('detects Ktor via gradle dependency and rejects unrelated projects', () => {
