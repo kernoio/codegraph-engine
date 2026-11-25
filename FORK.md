@@ -42,3 +42,27 @@ No auto-discovery of arbitrary `node_modules` packages inside the agent sandbox.
 
 The `kernoio/codegraph` Docker image builds from this repo (not npm
 `@colbymchenry/codegraph`). Aicore pins the image digest in `agent/gradle.properties`.
+
+## npm delivery
+
+Published as **`@kerno/codegraph`** plus one `@kerno/codegraph-<platform>-<arch>`
+bundle per target, by `.github/workflows/release.yml` (Actions → Release → Run
+workflow, after bumping `package.json`). Same thin-installer shape as upstream's
+`@colbymchenry/codegraph`; only the scope and the release repo differ, so
+`npm-shim.js`'s self-heal and `codegraph upgrade` fetch from this repo's GitHub
+Releases, never upstream's. `@kerno/codegraph-ui` is not published (`ui/` stays
+`private`).
+
+Upstream is MIT. Every package ships `LICENSE` (Colby Mchenry's notice, kept
+verbatim) and the platform bundles also ship `NODE-LICENSE` for the vendored
+Node runtime. Don't drop either.
+
+npm auth is OIDC trusted publishing. A trusted publisher can only be added to a
+package that exists, so the very first release (and the first release of any
+new platform package) runs with a short-lived `NPM_TOKEN` secret; then each
+package gets `kernoio/codegraph-engine` + `release.yml` as trusted publisher on
+npmjs.com and the secret is deleted.
+
+When rebasing onto upstream, re-run
+`git grep -n colbymchenry -- scripts src install.sh install.ps1 package.json .github`
+and keep the distribution names on `@kerno` / `kernoio/codegraph-engine`.

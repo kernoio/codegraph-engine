@@ -68,6 +68,10 @@ cp -R "$ROOT/dist" "$STAGE/lib/dist"
 # a 404 — the copy is verified, not assumed.
 node "$ROOT/scripts/check-ui-build.mjs" --root "$STAGE/lib"
 cp "$ROOT/package.json" "$ROOT/package-lock.json" "$STAGE/lib/"
+# MIT requires the copyright notice to travel with every copy, and the
+# vendored Node runtime carries its own (Node.js + bundled third parties).
+cp "$ROOT/LICENSE" "$STAGE/LICENSE"
+cp "$WORK/${NODE_DIST}/LICENSE" "$STAGE/NODE-LICENSE"
 echo "[bundle] installing production dependencies"
 # The staged package.json declares the `ui` workspace but the bundle carries
 # no ui/ source — only its build output. That is fine: ui/ has dev
