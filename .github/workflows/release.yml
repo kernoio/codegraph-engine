@@ -16,17 +16,18 @@ name: Release
 # `## [Unreleased]` — step 2 takes care of moving them.
 #
 # npm auth is OIDC trusted publishing (no NPM_TOKEN): every published package
-# (@colbymchenry/codegraph + the per-platform bundles) has this repo +
+# (@kerno/codegraph + the per-platform bundles) has this repo +
 # release.yml configured as its trusted publisher on npmjs.com. Adding a new
 # platform package means configuring its trusted publisher there before the
-# first release that includes it.
+# first release that includes it (or bootstrapping it with NPM_TOKEN, see
+# "Publish to npm").
 on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write      # create the GitHub Release + tag, push the CHANGELOG promote
-  id-token: write      # OIDC token for npm --provenance and Sigstore signing
-  attestations: write  # store the GitHub artifact attestations for the bundles
+  contents: write # create the GitHub Release + tag, push the CHANGELOG promote
+  id-token: write # OIDC token for npm --provenance and Sigstore signing
+  attestations: write # store the GitHub artifact attestations for the bundles
 
 jobs:
   # Native extraction-kernel prebuilds (docs/design/rust-kernel-migration-plan.md).
@@ -77,19 +78,13 @@ jobs:
           # Default checkout is detached at a SHA; we need an actual branch
           # so the CHANGELOG-promote commit knows where to push.
           ref: ${{ github.ref }}
-          # Authenticate as the maintainer (admin), not as github-actions[bot].
-          # The "Require PR approval for main branch" ruleset only lets the
-          # Admin repo role bypass — and GitHub blocks adding the GitHub
-          # Actions integration to bypass_actors on user-owned (non-org)
-          # repos with "Actor GitHub Actions integration must be part of
-          # the ruleset source or owner organization." So the auto-promote
-          # and auto-sync `git push origin HEAD:main` steps below both fail
-          # under the default GITHUB_TOKEN. Using a fine-grained PAT owned
-          # by the admin makes the push go through cleanly. Set the
-          # RELEASE_PAT secret with: contents:write on this repo, no other
-          # scopes. Rotate per your token policy; the workflow only runs
-          # on manual dispatch so the blast radius is small.
-          token: ${{ secrets.RELEASE_PAT }}
+          # The auto-promote and auto-sync steps below `git push origin
+          # HEAD:main`. Upstream needs an admin PAT (RELEASE_PAT) because a
+          # ruleset on its user-owned repo blocks github-actions[bot]. The
+          # kernoio fork has no such ruleset, so the workflow token
+          # (contents: write above) is enough; RELEASE_PAT still wins if a
+          # ruleset is ever added and the secret set.
+          token: ${{ secrets.RELEASE_PAT || github.token }}
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -213,7 +208,7 @@ jobs:
         # was built by this workflow from this repo — SHA256SUMS alone only
         # proves integrity, not origin, since it ships next to the bundles.
         # Verify any downloaded artifact with:
-        #   gh attestation verify <file> -R colbymchenry/codegraph
+        #   gh attestation verify <file> -R kernoio/codegraph-engine
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
@@ -252,7 +247,20 @@ jobs:
         # NPM_TOKEN. Provenance is generated automatically on this path; the
         # explicit --provenance keeps the intent visible and fails loudly if
         # OIDC is ever unavailable.
+        #
+        # Bootstrap: npmjs.com only lets a trusted publisher be configured on
+        # a package that already exists, so the first release of each
+        # @kerno/codegraph* package needs a token. Set the NPM_TOKEN secret
+        # (a short-lived granular token with publish rights on @kerno) for
+        # that one run, configure the trusted publisher on every package,
+        # then delete the secret. npm tries OIDC first and falls back to it.
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          if [ -n "$NPM_TOKEN" ]; then
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+            echo "::warning::NPM_TOKEN is set — bootstrap publish. Configure trusted publishing and delete the secret."
+          fi
           V="${{ steps.ver.outputs.version }}"
           bash scripts/pack-npm.sh "$V"
           # Platform packages first, then the main shim (which depends on them).

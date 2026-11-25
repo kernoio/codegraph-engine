@@ -5,7 +5,7 @@
 # Produces, under release/npm/:
 #   codegraph-<target>/   one per built bundle — the vendored Node + app, tagged
 #                         with os/cpu so npm installs only the matching one.
-#   main/                 the @colbymchenry/codegraph shim package: a tiny bin
+#   main/                 the @kerno/codegraph shim package: a tiny bin
 #                         that execs the matching platform bundle, with every
 #                         platform package in optionalDependencies.
 #
@@ -19,7 +19,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${1:-$(node -p "require('$ROOT/package.json').version")}"
-SCOPE="@colbymchenry"
+SCOPE="@kerno"
 REL="$ROOT/release"
 NPM="$REL/npm"
 
@@ -67,11 +67,11 @@ for archive in "${archives[@]}"; do
         version: process.env.VERSION,
         description: `CodeGraph self-contained bundle for ${process.env.TARGET}`,
         os: [process.env.OSV], cpu: [process.env.ARCHV],
-        files: [process.env.NODEFILE, "lib", "bin"],
+        files: [process.env.NODEFILE, "lib", "bin", "LICENSE", "NODE-LICENSE"],
         license: "MIT",
         // npm --provenance refuses to publish unless this matches the repo
         // the release workflow runs in.
-        repository: { type: "git", url: "git+https://github.com/colbymchenry/codegraph.git" }
+        repository: { type: "git", url: "git+https://github.com/kernoio/codegraph-engine.git" }
       }, null, 2) + "\n");
     ' "$pkgdir/package.json"
   targets+=("$target")
@@ -87,6 +87,7 @@ done
 cp "$ROOT/scripts/npm-shim.js" "$NPM/main/npm-shim.js"
 cp "$ROOT/scripts/npm-sdk.js" "$NPM/main/npm-sdk.js"
 [ -f "$ROOT/README.md" ] && cp "$ROOT/README.md" "$NPM/main/README.md"
+cp "$ROOT/LICENSE" "$NPM/main/LICENSE"
 
 # Ship the type declarations so `types`/`exports.types` resolve. Built from this
 # same release, so they can't skew from the runtime npm-sdk.js re-exports.
@@ -117,9 +118,9 @@ VERSION="$VERSION" SCOPE="$SCOPE" TARGETS="${targets[*]}" \
         "./package.json": "./package.json"
       },
       optionalDependencies: opt,
-      files: ["npm-shim.js","npm-sdk.js","dist","README.md"],
+      files: ["npm-shim.js","npm-sdk.js","dist","README.md","LICENSE"],
       license: "MIT",
-      repository: { type: "git", url: "git+https://github.com/colbymchenry/codegraph.git" }
+      repository: { type: "git", url: "git+https://github.com/kernoio/codegraph-engine.git" }
     }, null, 2) + "\n");
   ' "$NPM/main/package.json"
 
