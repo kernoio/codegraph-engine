@@ -7,6 +7,12 @@ the complete list of what is collected. If a field isn't on this page, it isn't 
 the ingest endpoint enforces this list as an allowlist and is itself
 [public, auditable code](telemetry-worker/) in this repository.
 
+> **`@kerno/codegraph` (the Kerno fork): telemetry is off by default.** Nothing is
+> recorded or sent unless you opt in with `codegraph telemetry on`, the installer's
+> toggle (which starts on "no"), or `CODEGRAPH_TELEMETRY=1`. The endpoint is the
+> upstream project's. A notice-only record left in `~/.codegraph` by an upstream
+> `@colbymchenry/codegraph` install does not count as opting in.
+
 ## Turning it off
 
 Any of these works, permanently:
@@ -21,9 +27,10 @@ export DO_NOT_TRACK=1          # the cross-tool standard — always honored
 ```
 
 `codegraph telemetry status` shows the current state, what decided it, and your machine ID.
-The interactive installer (`codegraph install`) asks up front with a visible default-on
-toggle and never re-asks. If you never saw the installer (e.g. `npx` straight into `init`),
-a one-line notice is printed to stderr before the first time anything is sent.
+The interactive installer (`codegraph install`) asks up front (upstream: default-on; this
+fork: default-off) and never re-asks. Upstream prints a one-line stderr notice before the
+first send when you never saw the installer; in this fork that only happens once
+`CODEGRAPH_TELEMETRY=1` turns it on.
 
 Off means off: when disabled, CodeGraph records nothing, opens no connection to the
 telemetry endpoint, and sends no "opted out" ping. Running processes recheck the stored
