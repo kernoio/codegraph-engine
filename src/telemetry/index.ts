@@ -182,7 +182,14 @@ export class Telemetry {
 
   /**
    * Resolution order (first match wins) — keep in sync with TELEMETRY.md:
-   * DO_NOT_TRACK=1 > CODEGRAPH_TELEMETRY=0|1 > stored config > default on.
+   * DO_NOT_TRACK=1 > CODEGRAPH_TELEMETRY=0|1 > stored choice > default off.
+   *
+   * Kerno fork: off unless someone opted in. The endpoint is upstream's, a
+   * third party to whoever runs `@kerno/codegraph`, so only an explicit
+   * choice (installer, `codegraph telemetry on`, or the env var) turns it on.
+   * A `default-notice` record is not one: upstream writes it when a machine
+   * merely saw its default-on notice, and `~/.codegraph` is shared with any
+   * upstream install on the same machine.
    */
   getStatus(): TelemetryStatus {
     const config = this.readConfig();
@@ -198,11 +205,12 @@ export class Telemetry {
       if (!on) this.clearPending();
       return { enabled: on, decidedBy: 'CODEGRAPH_TELEMETRY', machineId, configPath: this.configPath };
     }
-    if (config) {
+    if (config && config.consent_source !== 'default-notice') {
       if (!config.enabled) this.clearPending();
       return { enabled: config.enabled, decidedBy: 'config', machineId, configPath: this.configPath };
     }
-    return { enabled: true, decidedBy: 'default', machineId, configPath: this.configPath };
+    this.clearPending();
+    return { enabled: false, decidedBy: 'default', machineId, configPath: this.configPath };
   }
 
   isEnabled(): boolean {

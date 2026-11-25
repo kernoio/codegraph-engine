@@ -57,6 +57,15 @@ Upstream is MIT. Every package ships `LICENSE` (Colby Mchenry's notice, kept
 verbatim) and the platform bundles also ship `NODE-LICENSE` for the vendored
 Node runtime. Don't drop either.
 
+Telemetry is **off by default** (`src/telemetry/index.ts` `getStatus`): it reports
+to upstream's endpoint, a third party for Kerno users. Only an explicit choice
+turns it on; upstream's `default-notice` record is ignored. Keep this when
+rebasing; `__tests__/telemetry.test.ts` pins it.
+
+The installer still offers upstream's "CodeGraph Pro" beta waitlist
+(`src/installer/beta-signup.ts`), which sends the email typed in to
+getcodegraph.com. `kerno audit` never runs the installer.
+
 npm auth is OIDC trusted publishing. A trusted publisher can only be added to a
 package that exists, so the very first release (and the first release of any
 new platform package) runs with a short-lived `NPM_TOKEN` secret; then each

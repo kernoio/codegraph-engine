@@ -52,9 +52,23 @@ describe('Telemetry', () => {
   });
 
   describe('consent precedence', () => {
-    it('defaults to enabled when nothing decides otherwise', () => {
+    it('defaults to disabled when nothing decides otherwise (Kerno fork)', () => {
       const t = make();
-      expect(t.getStatus()).toMatchObject({ enabled: true, decidedBy: 'default', machineId: null });
+      expect(t.getStatus()).toMatchObject({ enabled: false, decidedBy: 'default', machineId: null });
+    });
+
+    it('a default-notice record from an upstream install is not consent (Kerno fork)', async () => {
+      const upstream = make({ env: { CODEGRAPH_TELEMETRY: '1' } });
+      upstream.recordLifecycle('index', { languages: ['go'] });
+      await upstream.flushNow();
+      expect(JSON.parse(fs.readFileSync(upstream.configPath, 'utf8')).consent_source).toBe('default-notice');
+      calls.length = 0;
+
+      const t = make();
+      expect(t.getStatus()).toMatchObject({ enabled: false, decidedBy: 'default' });
+      t.recordLifecycle('index', { languages: ['rust'] });
+      await t.flushNow();
+      expect(calls).toHaveLength(0);
     });
 
     it('DO_NOT_TRACK beats everything, including a forced-on env and config', () => {
@@ -96,6 +110,7 @@ describe('Telemetry', () => {
 
     it('turning telemetry off deletes buffered unsent data', () => {
       const t = make();
+      t.setEnabled(true, 'cli'); // off by default in the Kerno fork
       t.recordUsage('cli_command', 'init', true);
       t.persistSync();
       expect(fs.existsSync(t.queuePath)).toBe(true);
@@ -118,7 +133,7 @@ describe('Telemetry', () => {
     });
 
     it('prints the notice exactly once, before the first actual send', async () => {
-      const t = make();
+      const t = make({ env: { CODEGRAPH_TELEMETRY: '1' } });
       t.recordLifecycle('index', { languages: ['go'] });
       await t.flushNow();
       t.recordLifecycle('index', { languages: ['rust'] });
@@ -133,7 +148,7 @@ describe('Telemetry', () => {
     });
 
     it('keeps the machine id stable across instances and explicit toggles', async () => {
-      const t = make();
+      const t = make({ env: { CODEGRAPH_TELEMETRY: '1' } });
       t.recordLifecycle('install', { scope: 'local', kind: 'fresh' });
       await t.flushNow();
       const id1 = t.getStatus().machineId;
@@ -156,6 +171,7 @@ describe('Telemetry', () => {
   describe('rollups & sending', () => {
     it('aggregates per (day, kind, name, client) and sends only completed days', async () => {
       const t = make();
+      t.setEnabled(true, 'cli'); // off by default in the Kerno fork
       const client = { name: 'Claude Code', version: '2.1' };
       t.recordUsage('mcp_tool', 'codegraph_explore', true, client);
       t.recordUsage('mcp_tool', 'codegraph_explore', false, client);
@@ -188,6 +204,7 @@ describe('Telemetry', () => {
 
     it('lifecycle events send on the next flush regardless of day', async () => {
       const t = make();
+      t.setEnabled(true, 'cli'); // off by default in the Kerno fork
       t.recordLifecycle('install', { targets: ['claude'], scope: 'local', kind: 'fresh' });
       await t.flushNow();
       expect(calls).toHaveLength(1);
@@ -197,6 +214,7 @@ describe('Telemetry', () => {
 
     it('uses the production endpoint by default and honors the env override', async () => {
       const t = make();
+      t.setEnabled(true, 'cli'); // off by default in the Kerno fork
       t.recordLifecycle('uninstall', {});
       await t.flushNow();
       expect(calls[0]!.url).toBe(TELEMETRY_ENDPOINT);
@@ -209,6 +227,7 @@ describe('Telemetry', () => {
 
     it('re-queues on network failure and delivers on the next flush', async () => {
       const t = make({ fetchImpl: mockFetch(calls, { fail: true }) });
+      t.setEnabled(true, 'cli'); // off by default in the Kerno fork
       t.recordLifecycle('install', { scope: 'global', kind: 'upgrade' });
       await expect(t.flushNow()).resolves.toBeUndefined(); // fail silent
       expect(calls).toHaveLength(0);
@@ -228,6 +247,7 @@ describe('Telemetry', () => {
           init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
         })) as unknown as typeof globalThis.fetch;
       const t = make({ fetchImpl: hangingFetch });
+      t.setEnabled(true, 'cli'); // off by default in the Kerno fork
       t.recordLifecycle('install', { scope: 'local', kind: 'fresh' });
       const started = Date.now();
       await t.flushNow(100);
@@ -239,6 +259,7 @@ describe('Telemetry', () => {
   describe('buffer robustness', () => {
     it('caps the queue and drops oldest lines without leaving partial JSON', () => {
       const t = make();
+      t.setEnabled(true, 'cli'); // off by default in the Kerno fork
       const bigProps = { targets: Array.from({ length: 50 }, (_, i) => `agent-${i}`) };
       for (let i = 0; i < 600; i++) {
         t.recordLifecycle('install', { ...bigProps, kind: `fresh`, scope: `local`, seq: i });
@@ -253,6 +274,7 @@ describe('Telemetry', () => {
 
     it('skips corrupt lines and still delivers the valid ones', async () => {
       const t = make();
+      t.setEnabled(true, 'cli'); // off by default in the Kerno fork
       t.recordLifecycle('index', { languages: ['typescript'] });
       t.persistSync();
       fs.appendFileSync(t.queuePath, 'NOT JSON{{{\n');
